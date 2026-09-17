@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: Apache-2.0
+# The whole of what this demonstration's control plane decides.
+#
+# Four rules, one per capability the agent can ask about, and nothing else: no estate, no
+# seeding, no code. What used to be four regimes set in a program is four tables in a file
+# a person can read and edit, which is the thing worth showing.
+#
+# `scripts/start-control-plane.sh` renders this into the daemon's run directory with the
+# principal replaced by the account running the demonstration. Two reasons: the daemon
+# reads its policy from a file whose permissions it can establish — mode 0600 inside a
+# directory at 0700 — and a file in a checkout has whatever permissions the checkout has;
+# and a principal reference names an account, which a repository cannot know. Edit the
+# placeholder if you want a different one.
+#
+# No rule names a grant lifetime. Every allow mints a grant for the question it answered,
+# and this agent's bindings name the act's own sequence — reading the same corpus twice is
+# two acts — so each act is a question of its own and each one asks. A deployment that
+# wants one answer to cover a burst of identical calls names a lifetime here.
+#
+# The capability keys are lowercase words joined by dots, which is what the published
+# spelling admits and all it admits: an underscore inside a segment is refused, the refusal
+# is of the rule, and a refused rule makes this whole file unparseable — so the daemon would
+# load no policy rather than a partial one. `documents.read`, `report.write.internal`: the
+# distinction between what stays inside and what leaves is carried by a dot.
+format = 1
+
+[revision]
+reason = "the four capabilities this demonstration shows, under the four answers it shows"
+
+# Reading the internal corpus. Routine, and it still asks: the boundary that could not ask
+# has no answer to act on, whatever the answer would have been.
+[[rule]]
+id = "documents-read"
+capability = "documents.read"
+scope = "local"
+principals = ["user:the-account-that-runs-this-demonstration"]
+outcome = "allow"
+reason = "reading the internal corpus is routine for this agent"
+
+# Writing the report to the internal store. Also routine: it stays inside.
+[[rule]]
+id = "report-write-internal"
+capability = "report.write.internal"
+scope = "local"
+principals = ["user:the-account-that-runs-this-demonstration"]
+outcome = "allow"
+reason = "an internal report stays inside the organisation"
+
+# Sending the report outside. A person answers this one, and the wait is what makes their
+# answer final: a rejection denies the re-ask while the wait it ended is still running, so
+# the deadline is long enough for somebody to read the request and for a recording to be
+# taken — fifteen minutes — and well short of the day the recipe allows at most.
+[[rule]]
+id = "communications-send-external"
+capability = "communications.send.external"
+scope = "local"
+principals = ["user:the-account-that-runs-this-demonstration"]
+outcome = "suspend"
+reason = "sending outside the organisation is one person's decision, not the agent's"
+review_deadline_seconds = 900
+
+# Uploading data to an external destination. Refused outright: no approval is opened, and
+# nothing runs. A deny is an answer, not a failure to obtain one.
+[[rule]]
+id = "data-upload-external"
+capability = "data.upload.external"
+scope = "local"
+principals = ["user:the-account-that-runs-this-demonstration"]
+outcome = "deny"
+reason = "this demonstration never uploads data to an external destination"

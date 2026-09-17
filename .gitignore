@@ -1,0 +1,16 @@
+# A reader's own configuration, and what a take writes. Neither is committed, and
+# `docs/OPEN_SOURCE_READINESS.md` says what each holds and why it must not be published.
+# There is no credential here to keep out: the control plane learns who is calling from the
+# connection's peer, so this demonstration presents no token, key or session at all.
+.env
+runtime/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.wheelhouse/
+.venv-client/

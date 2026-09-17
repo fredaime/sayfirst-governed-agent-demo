@@ -1,0 +1,84 @@
+# SPDX-License-Identifier: Apache-2.0
+[project]
+name = "sayfirst-governed-agent-demo"
+version = "0.2.0"
+description = "A governed agent demonstration: the model proposes, the control plane decides"
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+license = "Apache-2.0"
+authors = [{ name = "fredaime", email = "frederic.aime@gmail.com" }]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
+# What this demonstration runs on, and what it asks. The two pinned distributions are the
+# published contract and the published boundary, at the version of the release this
+# demonstration shows. Neither the control plane's own distribution nor the product
+# command-line interface is here: the first is the server, which this program never
+# imports and which runs as a separate process, and the second is a command a person
+# types rather than a library. The version is not a range: a demonstration of one release
+# pins that release, so one number is said everywhere.
+dependencies = [
+  "langgraph>=1.0,<2.0",
+  "httpx>=0.27",
+  "sayfirst-contract==0.2.0",
+  "sayfirst-boundary==0.2.0",
+]
+
+# The public repository this distribution sends a reader to. It is created fresh in the act
+# that publishes this tree, and this is the name chosen for that act.
+# `tests/test_pointers_survive_publication.py` holds it, so a rename lands here and there
+# together or not at all. No licence classifier: the licence is declared as an expression
+# above, and an index refuses a distribution that carries both.
+[project.urls]
+Repository = "https://github.com/fredaime/sayfirst-governed-agent-demo"
+Documentation = "https://github.com/fredaime/sayfirst-governed-agent-demo/blob/main/README.md"
+Changelog = "https://github.com/fredaime/sayfirst-governed-agent-demo/blob/main/CHANGELOG.md"
+
+[project.scripts]
+sayfirst-governed-agent-demo = "sayfirst_governed_agent_demo.app:main"
+
+[dependency-groups]
+dev = [
+  "pytest==8.4.1",
+  "ruff==0.12.12",
+]
+# The control plane's own distribution, in a group of its own rather than among the runtime
+# dependencies above. It is a PROGRAM this repository runs and never a module it imports:
+# `./scripts/start-control-plane.sh` runs its daemon as a separate process during development,
+# the end-to-end tier starts one of its own, and both speak to it over a socket. Nothing under
+# `src/` imports it, and `tests/test_direction_of_dependency.py` holds both halves of that.
+e2e = [
+  "sayfirst-control-plane==0.2.0",
+]
+
+[build-system]
+requires = ["hatchling==1.32.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sayfirst_governed_agent_demo"]
+
+[tool.hatch.build.targets.sdist.force-include]
+"LICENSE" = "LICENSE"
+"NOTICE" = "NOTICE"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# A skip is reported with its reason rather than counted as a dot: "held" and "not
+# runnable" are different outcomes, and the gate reads the difference.
+addopts = ["-rsxX"]
+markers = [
+  "e2e: starts a real control plane daemon as a separate process",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
