@@ -55,9 +55,12 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 #: The import packages whose absence this rule reads as « the open distributions are not
 #: here ». Named because a distribution that is not installed cannot be asked what it calls
 #: itself. The server is among them: the end-to-end tier starts a real daemon, and a run
-#: without one proves nothing about this demonstration against a control plane.
+#: without one proves nothing about this demonstration against a control plane. So is the
+#: quickstart launcher its distribution has shipped beside the server since 0.3.0: one
+#: distribution, two packages, absent together — and a list that named one of them would be
+#: asked to agree with a distribution that provides both.
 OPEN_PACKAGES: frozenset[str] = frozenset(
-    {"sayfirst_contract", "sayfirst_boundary", "sayfirst_control_plane"}
+    {"sayfirst_contract", "sayfirst_boundary", "sayfirst_control_plane", "sayfirst_quickstart"}
 )
 
 #: The distributions that provide them, in the spelling the project file pins.

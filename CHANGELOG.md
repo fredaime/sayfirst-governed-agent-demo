@@ -8,6 +8,16 @@ deciding whether the copy in front of them is the one these documents describe.
 
 ## Unreleased
 
+## 0.3.0
+
+- The demonstration runs against the 0.3.0 control plane and command-line interface: the
+  three open distributions it pins, and the tag its workflow checks the two public products
+  out at, move together to 0.3.0 — one number, said everywhere.
+- The gate installs only the wheels a run builds. A wheel an earlier run left in the
+  wheelhouse can no longer answer for a tree this run never read: across a version bump the
+  command a person answers with used to meet two candidates, and a pinned distribution could
+  resolve to the earlier run's build.
+
 ## 0.2.0
 
 - The demonstration runs against the open control plane: a daemon on a local socket, a

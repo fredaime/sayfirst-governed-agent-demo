@@ -144,6 +144,12 @@ else
 fi
 
 mkdir -p "$wheelhouse"
+# Only what this run builds may be installed. The wheelhouse outlives a run, so a wheel an
+# earlier run built for another version would sit beside this run's: the command a person
+# answers with, installed by its file, would meet two candidates, and a pinned open
+# distribution would resolve to the earlier run's wheel whenever the pin names that version —
+# a report about a tree this run never read. Emptied before anything is built.
+rm -f "$wheelhouse"/*.whl
 
 # The runner's own directory, made fresh under the run root with a SHORT template per run, so
 # that two gate runs on one machine cannot take each other's — the fixed path this gate used
