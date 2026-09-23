@@ -108,13 +108,13 @@ What each claim means, and the longer list of what is *not* proven:
 | `sayfirst-contract==0.3.0` | the socket client the boundary speaks through | on the index |
 | `sayfirst-boundary==0.3.0` | the boundary itself | on the index |
 | `sayfirst-cli` | the command a person answers with | on the index |
-| `sayfirst-control-plane==0.3.0` | the daemon this demonstration asks | publishing |
+| `sayfirst-control-plane==0.3.0` | the daemon this demonstration asks | on the index |
 
 `uv tool install sayfirst-cli==0.3.0` gets you the command a person types — five minutes with
 it on its own [`QUICKSTART.md`](https://github.com/fredaime/sayfirst-cli/blob/v0.3.0/QUICKSTART.md)
-— and it is a dependency of nothing here. The daemon's distribution is not on the index yet,
-so `./scripts/bootstrap.sh` builds every wheel it needs from a checkout of each public
-repository, at the tag of the release this demonstration shows — two clones and one line:
+— and it is a dependency of nothing here. `./scripts/bootstrap.sh` builds every wheel it
+needs from a checkout of each public repository, at the tag of the release this demonstration
+shows, rather than taking them from the index — two clones and one line:
 
 ```bash
 git clone --branch v0.3.0 https://github.com/fredaime/sayfirst-control-plane
