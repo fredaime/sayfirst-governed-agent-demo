@@ -29,8 +29,8 @@ SOURCE = REPOSITORY / "src"
 RUNTIME = [
     "langgraph>=1.0,<2.0",
     "httpx>=0.27",
-    "sayfirst-contract==0.2.0",
-    "sayfirst-boundary==0.2.0",
+    "sayfirst-contract==0.3.0",
+    "sayfirst-boundary==0.3.0",
 ]
 
 #: What it never imports, whatever is installed beside it.
@@ -64,7 +64,7 @@ def test_this_demonstration_depends_on_the_contract_and_the_boundary_and_nothing
 def test_the_server_is_declared_apart_and_the_client_is_no_dependency_at_all() -> None:
     document = _project()
     groups = document["dependency-groups"]
-    assert groups["e2e"] == ["sayfirst-control-plane==0.2.0"], groups["e2e"]
+    assert groups["e2e"] == ["sayfirst-control-plane==0.3.0"], groups["e2e"]
     declared = [requirement for group in groups.values() for requirement in group] + list(
         document["project"]["dependencies"]
     )

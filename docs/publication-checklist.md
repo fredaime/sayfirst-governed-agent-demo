@@ -20,7 +20,7 @@ the repository itself, at a tag, and the lines below are what that act needs.
   workflow runs the check, and the setting makes a failure block. It is a line here because an
   act held by review with no line is an act nobody is reminded to perform.
 - **Read what the tree pins, and decide nothing.** Two published distributions at one version,
-  `sayfirst-contract==0.2.0` and `sayfirst-boundary==0.2.0`, plus `langgraph` and `httpx`; the
+  `sayfirst-contract==0.3.0` and `sayfirst-boundary==0.3.0`, plus `langgraph` and `httpx`; the
   control plane's own distribution at the same version, in a group of its own, because the
   start script and the acceptance suite each run its daemon as a separate process and nothing
   this distribution ships imports it; and the product command-line interface, which is a

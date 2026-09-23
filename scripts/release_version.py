@@ -8,7 +8,7 @@ guard and a person checking a copy must agree about the version, and a version s
 twice is a version that will eventually be spelled two ways.
 
     python scripts/release_version.py
-    python scripts/release_version.py --expect 0.2.0
+    python scripts/release_version.py --expect 0.3.0
 
 It needs nothing beyond the standard library's TOML reader, so it runs the same way under
 a bare interpreter as it does inside the gate's environment.

@@ -92,6 +92,16 @@ COPIES_A_TREE = re.compile(
     r"(?:^|\s)(?:cp\s+-a|rsync)\b[^\n]*\$\{?(?:source|contract_source|client_source)"
 )
 
+#: The line that empties the wheelhouse of every wheel an earlier run built, and the builds
+#: that fill it again. The wheelhouse outlives a run, so without the first a wheel built for
+#: another version sits beside this run's: the command a person answers with, installed by
+#: its file, meets two candidates and the run stops; and a pinned open distribution resolves
+#: to whichever version the pin names — an earlier run's wheel, silently, whenever the ref
+#: this run built carries another. That second case is the one that matters: a gate green on
+#: a tree it never read.
+CLEARS_OLD_WHEELS = re.compile(r'^\s*rm -f "\$wheelhouse"/\*\.whl\s*$')
+BUILDS_INTO_THE_WHEELHOUSE = re.compile(r'^\s*uv build\b.*-o "\$wheelhouse"')
+
 #: A check spelled out in the workflow itself. `uv` is deliberately not among them: the
 #: installer action is how this workflow gets the tool the gate runs, not a check of its own.
 CI_ONLY_TOOLS = ("pytest", "ruff", "python -m", "coverage", "mypy")
@@ -304,6 +314,55 @@ def test_the_named_ref_rule_catches_a_gate_that_would_read_a_checkout() -> None:
         planted = GATE_TEXT.replace(was, becomes)
         assert planted != GATE_TEXT, f"the plant for {mutation} changed nothing"
         assert _reads_a_working_tree(planted), f"FAIL {mutation} was not caught"
+
+
+def _installs_what_it_did_not_build(text: str) -> list[str]:
+    """Every way a full run could install a wheel an earlier run left in the wheelhouse.
+
+    One reading, so that the green case and the planted defects below ask the same
+    question: two copies of one rule is how a guard and its own probe stop agreeing.
+    """
+    lines = text.splitlines()
+    clears = [index for index, line in enumerate(lines) if CLEARS_OLD_WHEELS.search(line)]
+    builds = [index for index, line in enumerate(lines) if BUILDS_INTO_THE_WHEELHOUSE.search(line)]
+    if not builds:
+        return ["nothing builds into the wheelhouse, so this rule has nothing to hold"]
+    if not clears:
+        return ["nothing removes the wheels an earlier run built before this run builds its own"]
+    if min(clears) > min(builds):
+        return ["the wheels an earlier run built are removed only after this run has built"]
+    return []
+
+
+def test_a_full_run_installs_only_what_it_built() -> None:
+    """A gate that installed an earlier run's wheel would report on a tree it never read.
+
+    Found by running the full gate twice across a version bump: the second run built the
+    new version, and the wheelhouse still held the old one. The command a person answers
+    with, installed by its file, met two candidates and the run stopped; the open
+    distributions, installed by pin, would have resolved to the earlier run's wheels
+    whenever the pin named the old version, and the run would have gone on green.
+    """
+    assert _installs_what_it_did_not_build(GATE_TEXT) == []
+
+
+def test_the_wheelhouse_rule_catches_a_gate_that_keeps_old_wheels() -> None:
+    """WATCHED FIRING, against copies of the real file: the removal gone, and moved late."""
+    removal = next(line for line in GATE_TEXT.splitlines() if CLEARS_OLD_WHEELS.search(line))
+    first_build = next(
+        line for line in GATE_TEXT.splitlines() if BUILDS_INTO_THE_WHEELHOUSE.search(line)
+    )
+    for mutation, planted in (
+        ("the removal deleted", GATE_TEXT.replace(removal + "\n", "")),
+        (
+            "the removal moved after the first build",
+            GATE_TEXT.replace(removal + "\n", "").replace(
+                first_build, first_build + "\n" + removal, 1
+            ),
+        ),
+    ):
+        assert planted != GATE_TEXT, f"the plant for {mutation} changed nothing"
+        assert _installs_what_it_did_not_build(planted), f"FAIL {mutation} was not caught"
 
 
 def test_the_gate_names_no_checkout_by_default() -> None:

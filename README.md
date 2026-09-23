@@ -105,22 +105,22 @@ What each claim means, and the longer list of what is *not* proven:
 
 | Distribution | What it is | Where it is |
 |---|---|---|
-| `sayfirst-contract==0.2.0` | the socket client the boundary speaks through | on the index |
-| `sayfirst-boundary==0.2.0` | the boundary itself | on the index |
+| `sayfirst-contract==0.3.0` | the socket client the boundary speaks through | on the index |
+| `sayfirst-boundary==0.3.0` | the boundary itself | on the index |
 | `sayfirst-cli` | the command a person answers with | on the index |
-| `sayfirst-control-plane==0.2.0` | the daemon this demonstration asks | publishing |
+| `sayfirst-control-plane==0.3.0` | the daemon this demonstration asks | publishing |
 
-`uv tool install sayfirst-cli==0.2.0` gets you the command a person types — five minutes with
-it on its own [`QUICKSTART.md`](https://github.com/fredaime/sayfirst-cli/blob/v0.2.0/QUICKSTART.md)
+`uv tool install sayfirst-cli==0.3.0` gets you the command a person types — five minutes with
+it on its own [`QUICKSTART.md`](https://github.com/fredaime/sayfirst-cli/blob/v0.3.0/QUICKSTART.md)
 — and it is a dependency of nothing here. The daemon's distribution is not on the index yet,
 so `./scripts/bootstrap.sh` builds every wheel it needs from a checkout of each public
 repository, at the tag of the release this demonstration shows — two clones and one line:
 
 ```bash
-git clone --branch v0.2.0 https://github.com/fredaime/sayfirst-control-plane
-git clone --branch v0.2.0 https://github.com/fredaime/sayfirst-cli
-SAYFIRST_CONTRACT_SOURCE=../sayfirst-control-plane SAYFIRST_CONTRACT_REF=v0.2.0 \
-SAYFIRST_CLIENT_SOURCE=../sayfirst-cli SAYFIRST_CLIENT_REF=v0.2.0 \
+git clone --branch v0.3.0 https://github.com/fredaime/sayfirst-control-plane
+git clone --branch v0.3.0 https://github.com/fredaime/sayfirst-cli
+SAYFIRST_CONTRACT_SOURCE=../sayfirst-control-plane SAYFIRST_CONTRACT_REF=v0.3.0 \
+SAYFIRST_CLIENT_SOURCE=../sayfirst-cli SAYFIRST_CLIENT_REF=v0.3.0 \
   ./scripts/bootstrap.sh
 ```
 
@@ -181,7 +181,7 @@ is required: a model is a configuration line here, which is the architectural po
 **The grade is observability, not proof.** The daemon these scripts start runs as the same
 account as the agent, which can therefore write or replace the store. The grade above it is
 defined and unreached by this version; all three are in the control plane's own
-[`SECURITY.md`](https://github.com/fredaime/sayfirst-control-plane/blob/v0.2.0/SECURITY.md).
+[`SECURITY.md`](https://github.com/fredaime/sayfirst-control-plane/blob/v0.3.0/SECURITY.md).
 
 **A reduced gate is green and is not a pass.** `./scripts/gate.sh` exits `75` on a machine
 that cannot build the open distributions: it names and counts every check it did not run and
@@ -246,7 +246,7 @@ this never depends on, and what must not be published.
 
 ## Status
 
-**0.2.0**, the first public release, and one number said everywhere. What the next one
+**0.3.0**, and one number said everywhere. What the next one
 carries is written down already: the daemon's distribution on an index, which retires both
 checkouts above and the gate's reduced mode with it
 ([`docs/publication-checklist.md`](docs/publication-checklist.md)), and the evidence grade,

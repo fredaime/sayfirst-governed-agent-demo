@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 [project]
 name = "sayfirst-governed-agent-demo"
-version = "0.2.0"
+version = "0.3.0"
 description = "A governed agent demonstration: the model proposes, the control plane decides"
 readme = "README.md"
 requires-python = ">=3.12,<3.15"
@@ -24,8 +24,8 @@ classifiers = [
 dependencies = [
   "langgraph>=1.0,<2.0",
   "httpx>=0.27",
-  "sayfirst-contract==0.2.0",
-  "sayfirst-boundary==0.2.0",
+  "sayfirst-contract==0.3.0",
+  "sayfirst-boundary==0.3.0",
 ]
 
 # The public repository this distribution sends a reader to. It is created fresh in the act
@@ -52,7 +52,7 @@ dev = [
 # the end-to-end tier starts one of its own, and both speak to it over a socket. Nothing under
 # `src/` imports it, and `tests/test_direction_of_dependency.py` holds both halves of that.
 e2e = [
-  "sayfirst-control-plane==0.2.0",
+  "sayfirst-control-plane==0.3.0",
 ]
 
 [build-system]
