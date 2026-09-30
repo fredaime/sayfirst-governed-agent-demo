@@ -99,9 +99,9 @@ read_environment_file() {
 #: one directory and running a program out of another.
 demo_environment=".venv"
 
-#: The status a refusal here exits with — the one these scripts already used for a
-#: precondition nothing they could do would satisfy.
-demo_refusal_status=1
+#: The status a refusal here exits with: 7, the configuration status the application uses
+#: for a precondition nothing it could do would satisfy. 1 is reserved for denied or rejected.
+demo_refusal_status=7
 
 refuse() {
   local line
@@ -121,14 +121,13 @@ require_the_environment() {
 
 # ONE sentence, so that the three scripts refuse in one voice and only the name differs. It
 # names the distribution and both ways to obtain it, because a reader who meets this refusal
-# has done nothing wrong: the distributions are published on no index yet, so the only way to
-# hold one today is a checkout of the two open repositories, and the bootstrap builds them
-# from one when it is told where they are.
+# has done nothing wrong: the bootstrap installs it from the index, or builds it from a
+# checkout of the two open repositories when it is told where they are.
 refuse_a_missing_distribution() {
   refuse "$1 is not installed here;" \
-    "run ./scripts/bootstrap.sh with SAYFIRST_CONTRACT_SOURCE and SAYFIRST_CLIENT_SOURCE" \
-    "naming checkouts of the two open repositories, or install it from the index once" \
-    "it is published."
+    "run ./scripts/bootstrap.sh, which installs it from the index, or with" \
+    "SAYFIRST_CONTRACT_SOURCE and SAYFIRST_CLIENT_SOURCE naming checkouts of the two open" \
+    "repositories to build it from them."
 }
 
 # Whether this environment can import what the program about to run imports, asked of the

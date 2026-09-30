@@ -51,7 +51,7 @@ refuse_an_unattributed_socket() {
   echo "       kill \$(the process it names)" >&2
   echo "     If nothing is listening, the socket is stale and you can remove it by hand:" >&2
   echo "       rm $run/daemon.sock" >&2
-  exit 1
+  exit "$demo_refusal_status"
 }
 
 stop_the_control_plane() {
@@ -98,7 +98,7 @@ if ! stop_the_control_plane; then
   echo "[--] the control plane at process $recorded_process is still running." >&2
   echo "     Nothing was removed: a run directory taken out from under a live daemon" >&2
   echo "     leaves it holding files nothing can reach. Stop it and run this again." >&2
-  exit 1
+  exit "$demo_refusal_status"
 fi
 
 rm -rf "$run"

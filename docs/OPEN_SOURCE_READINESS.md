@@ -3,41 +3,43 @@
 
 ## Status
 
-**Publishable.** Two of the three things that used to block this are published distributions
-that this repository now pins, and the third — the authority itself — is a process a reader
-starts with a script in this repository, from a policy file they can read and edit. Nothing
-is left that a reader cannot obtain.
+**Published.** The three things that used to block this are all published distributions on
+the index: the two this repository pins at runtime, and the authority itself — the daemon, a
+process a reader starts with a script in this repository, from a policy file they can read
+and edit. Nothing is left that a reader cannot obtain.
 
-What remains is an act rather than a question, and `docs/publication-checklist.md` is the
-page that names it.
+The act that remained was carried out: this repository was published on 2026-09-17, and
+`docs/publication-checklist.md` is the page that names the steps it took.
 
 ## What this depends on, and at which pin
 
 | Distribution | Why | Where it is declared |
 |---|---|---|
-| `sayfirst-contract==0.3.0` | the socket client the boundary speaks through | `project.dependencies` |
-| `sayfirst-boundary==0.3.0` | the boundary itself | `project.dependencies` |
+| `sayfirst-contract==0.3.2` | the socket client the boundary speaks through | `project.dependencies` |
+| `sayfirst-boundary==0.3.2` | the boundary itself | `project.dependencies` |
 | `langgraph` | the agent framework this demonstration governs a node of | `project.dependencies` |
 | `httpx` | the OpenAI-compatible transport, and the health check's model probe | `project.dependencies` |
-| `sayfirst-control-plane==0.3.0` | **development and test, never imported**: `./scripts/start-control-plane.sh` runs its daemon as a separate process, and the acceptance tier starts one of its own | a dependency group of its own |
+| `sayfirst-control-plane==0.3.2` | **development and test, never imported**: `./scripts/start-control-plane.sh` runs its daemon as a separate process, and the acceptance tier starts one of its own | a dependency group of its own |
 
 One number, said everywhere: this demonstration shows one release and pins that release, so
 the version is not a range.
 
-**Where they come from today.** None of the three is on an index yet, so the way to hold one
-is a checkout of the product that builds it, at the tag of that release — and both products
-are public repositories a reader can open:
+**Where they come from today.** All three are on the index at that pin, and so is the
+command a person answers with: `./scripts/bootstrap.sh` and `./scripts/gate.sh` install them
+from there when no checkout is named. A contributor can instead build them from a checkout of
+the product that builds each, at the tag of that release — and both products are public
+repositories a reader can open:
 
 | What | Public repository | Tag |
 |---|---|---|
-| the contract, the boundary and the server | [`fredaime/sayfirst-control-plane`](https://github.com/fredaime/sayfirst-control-plane) | `v0.3.0` |
-| the command a person answers with | [`fredaime/sayfirst-cli`](https://github.com/fredaime/sayfirst-cli) | `v0.3.0` |
+| the contract, the boundary and the server | [`fredaime/sayfirst-control-plane`](https://github.com/fredaime/sayfirst-control-plane) | `v0.3.2` |
+| the command a person answers with | [`fredaime/sayfirst-cli`](https://github.com/fredaime/sayfirst-cli) | `v0.3.2` |
 
-`scripts/gate.sh` builds the wheels from an archive of that tag rather than from whatever a
-checkout has out, and `.github/workflows/ci.yml` checks both repositories out at it with no
-credential. That is what publication changed here: the two addresses are public, so the
-workflow spells them instead of reading them out of a setting. `README.md` carries the two
-commands a reader runs.
+Named that way, `scripts/gate.sh` builds the wheels from an archive of that tag rather than
+from whatever a checkout has out, and `.github/workflows/ci.yml` checks both repositories out
+at it with no credential. That is what publication changed here: the two addresses are
+public, so the workflow spells them instead of reading them out of a setting. `README.md`
+carries the commands a reader runs, from the index and from checkouts.
 
 **Not a dependency at all:** the product command-line interface. It is a command a person
 installs as a tool and types — to answer a suspended act and to read the chain — and nothing

@@ -6,8 +6,9 @@ owns rather than inherits. vLLM, Ollama and every other OpenAI-compatible
 server differ only in `base_url` and `model`, so one client covers all of them
 and a second implementation would be dead weight.
 
-The scripted model exists for tests only. `MODEL_MODE=real` never falls back to
-it: an inference endpoint that cannot be reached is a loud startup failure and
+The scripted model is the tests' own, and what `MODEL_MODE=fixture` (the
+default) plays -- see transcripts.py. `MODEL_MODE=real` never falls back to it:
+an inference endpoint that cannot be reached is a loud startup failure and
 never a quiet substitution, because a demonstration that degraded silently
 would be showing governance over a model that was never in the loop.
 """
@@ -173,7 +174,7 @@ class OpenAICompatibleModel:
 
 @dataclass
 class ScriptedModel:
-    """A deterministic transcript. Tests only -- never reachable in demo mode.
+    """A deterministic transcript: the tests' own, and fixture mode's (see transcripts.py).
 
     Each entry is consumed in order; the last one repeats, so a graph that loops
     one turn longer than the script anticipated ends rather than hanging.
@@ -181,6 +182,8 @@ class ScriptedModel:
 
     replies: list[ModelReply]
     identity: str = "scripted transcript (no model)"
+    #: What the turn line says this engine does. Nothing reasons here, so it says so.
+    turn_verb: str = "proposes"
     calls: list[tuple[Any, ...]] = field(default_factory=list)
     _cursor: int = 0
 
@@ -195,14 +198,22 @@ class ScriptedModel:
         return self.replies[index]
 
 
-def build_model(settings: ModelSettings) -> ChatModel:
+def turn_line(model: ChatModel) -> str:
+    """The line recorded on every turn: who the engine is, and what it does on a turn.
+
+    A model reasons; a scripted transcript only proposes, and saying « reasoning » over
+    a transcript would claim a model that never ran. An engine that names no verb of
+    its own keeps « reasoning ».
+    """
+    return f"{model.identity} {getattr(model, 'turn_verb', 'reasoning')}"
+
+
+def build_model(settings: ModelSettings, *, take: str = "hitl") -> ChatModel:
     """The one place the mode decides which engine runs, and says so loudly."""
     if settings.mode is ModelMode.fixture:
-        raise ConfigurationRefused(
-            "MODEL_MODE=fixture builds no model here: the scripted transcript is the "
-            "tests' own, constructed by the test that scripts it. To watch this agent "
-            "reason, set MODEL_MODE=real with MODEL_BASE_URL and MODEL_NAME."
-        )
+        from .transcripts import fixture_transcript
+
+        return fixture_transcript(take)
     model = OpenAICompatibleModel(settings)
     model.probe()
     return model

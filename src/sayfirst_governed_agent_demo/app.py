@@ -124,11 +124,12 @@ def _suspension_notice(result: Any, settings: Settings, boundary_setup: Any) -> 
     # The scope and the address are read from the module that actually composed the
     # client, never from a second reading of the environment: a notice that printed a
     # different address from the one the question went to would be worse than none.
-    print(
-        f"    sayfirst approvals approve --approval {result.approval_ref} "
-        f"--scope {boundary_setup.SCOPE} --socket {boundary_setup.SOCKET_PATH}",
-        flush=True,
-    )
+    for verb in ("show", "approve", "reject"):
+        print(
+            f"    sayfirst approvals {verb} --approval {result.approval_ref} "
+            f"--scope {boundary_setup.SCOPE} --socket {boundary_setup.SOCKET_PATH}",
+            flush=True,
+        )
     print(
         f"  Resuming grants nothing: the node asks again and the control plane answers.{RESET}\n",
         flush=True,
@@ -163,12 +164,10 @@ def main(argv: list[str] | None = None) -> int:
 
     events = EventLog()
     try:
-        model = build_model(settings.model)
+        model = build_model(settings.model, take=scenario.name)
     except (ConfigurationRefused, ModelUnavailable) as unavailable:
-        # Two refusals, one exit. `fixture` is the default mode now and no script forces a
-        # mode on a run, so the commonest way to arrive here is a reader who named no model
-        # at all — and what they need is the sentence saying which settings to name, not a
-        # traceback through a call they did not make.
+        # A real model that cannot be reached, or a configuration that cannot build one:
+        # said in one sentence, not a traceback.
         print(f"\n\033[31m{unavailable}{RESET}\n", file=sys.stderr, flush=True)
         return 7
 
@@ -199,6 +198,12 @@ def main(argv: list[str] | None = None) -> int:
     while result.verdict is SUSPENDED:
         _suspension_notice(result, settings, boundary_setup)
         if scenario.on_suspend == "report":
+            print(
+                f"{DIM}  Nothing will resume in this process: the pause is not durable. The "
+                f"wait stays pending on the control plane until someone answers it or its "
+                f"deadline passes; ./scripts/reset-demo.sh clears it.{RESET}",
+                flush=True,
+            )
             _epilogue(settings, result, events)
             return result.exit_code
         answer = wait_for_a_person(str(result.approval_ref), timeout_s=args.approval_timeout)

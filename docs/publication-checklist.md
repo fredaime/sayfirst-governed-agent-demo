@@ -20,38 +20,42 @@ the repository itself, at a tag, and the lines below are what that act needs.
   workflow runs the check, and the setting makes a failure block. It is a line here because an
   act held by review with no line is an act nobody is reminded to perform.
 - **Read what the tree pins, and decide nothing.** Two published distributions at one version,
-  `sayfirst-contract==0.3.0` and `sayfirst-boundary==0.3.0`, plus `langgraph` and `httpx`; the
+  `sayfirst-contract==0.3.2` and `sayfirst-boundary==0.3.2`, plus `langgraph` and `httpx`; the
   control plane's own distribution at the same version, in a group of its own, because the
   start script and the acceptance suite each run its daemon as a separate process and nothing
   this distribution ships imports it; and the product command-line interface, which is a
   command a person types and a dependency of nothing. One number, said everywhere, and it is
   the number of the release this demonstration shows.
 
-## The two things publication changes
+## What publication changed
 
-During development neither the contract nor the command exists on any index, so the gate is
-told where a checkout of each is — `SAYFIRST_CONTRACT_SOURCE` with `SAYFIRST_CONTRACT_REF`, and
-`SAYFIRST_CLIENT_SOURCE` with `SAYFIRST_CLIENT_REF` — and it builds the wheels from an archive
-of that named ref. Neither variable has a default path, deliberately: a default would name a
-repository this one does not publish, inside a file it does publish. Publication retires both
-arrangements, and until it does, two published files describe a world that is one act away:
+While the two products were not yet this repository's to name, the gate was told where a
+checkout of each was — `SAYFIRST_CONTRACT_SOURCE` with `SAYFIRST_CONTRACT_REF`, and
+`SAYFIRST_CLIENT_SOURCE` with `SAYFIRST_CLIENT_REF` — and built the wheels from an archive of
+that named ref; the workflow read the two repository names out of repository variables and
+reached them with a credential. Neither variable had a default path, and neither has one now:
+a default would name a repository this one does not publish, inside a file it does publish.
 
-1. **the gate's sources become the index.** `scripts/gate.sh` builds four wheels from a checkout
-   and installs them with no index; afterwards it installs the pins from the index and the
-   `materialise` step goes with them. The reduced mode goes too: the distributions are no longer
-   absent anywhere, so a reduced run has nothing to report and `tests/test_gate_modes.py`, which
-   requires three outcomes, is what has to be rewritten with it;
-2. **the workflow's two checkouts become an install.** `.github/workflows/ci.yml` reads the two
-   repositories out of repository variables and reaches them with a credential, because their
-   names are not this repository's to publish and their content is not public yet. On
-   publication day both checkouts become an ordinary install, the credential and the two
-   variables are retired, and the reduced job — which exists for a fork that has neither — is
-   retired with them.
+An earlier version of this page said publication would retire both arrangements, and the
+reduced mode with them. It did less than that, and what it did is recorded here so that no
+published file describes the world this page once predicted:
 
-Read those two files again after the edits: each says, in its own comments, that a fork gets a
-reduced gate because the distributions are published nowhere. That sentence stops being true on
-the day this list is worked through, and a published file claiming it afterwards is the defect
-this line exists to prevent.
+1. **the distributions are on the index**, at the version this tree pins, and a bare
+   `./scripts/gate.sh` installs them from it — the index route, which arrived in 0.3.1
+   ([CHANGELOG.md](../CHANGELOG.md) names the release). The checkouts route stayed, for a
+   contributor and for the workflow's full job, and `materialise` with it. The reduced mode
+   stayed too: a machine neither route reaches — no network, or the index refused with no
+   checkout named — still gets a run that names what it did not prove, and
+   `tests/test_gate_modes.py` still requires three outcomes;
+2. **the workflow checks out the two public repositories by name, at the tag this tree pins,
+   with no credential.** The repository variables and the credential are gone, and the same
+   guard refuses either coming back. The reduced job stayed, for a fork whose runner reaches
+   neither product at the tag, and the index route is a third job beside the two.
+
+Read those two files with this page: each says, in its own comments, where the distributions
+come from and what a run without them proves. A published file claiming they are absent
+everywhere is the defect `tests/test_no_stale_publication_claims.py` exists to catch, and
+this page is the file that guard was widened for.
 
 ## The order
 

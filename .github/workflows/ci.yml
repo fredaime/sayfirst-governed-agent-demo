@@ -11,35 +11,46 @@
 # installed from an index, so there is no distribution for a release job to publish and
 # adding one would be a decision about publishing rather than a convenience.
 #
-# Two limitations, stated rather than hidden.
+# Where the three distributions this repository is built on come from, stated rather than
+# hidden. The gate has two routes to them and this workflow runs both, in a job each.
 #
-# The three distributions this repository is built on are published on no index yet. That is
-# why the full gate still builds them from a checkout of each rather than installing them:
-# when they do reach an index, both checkouts below become an ordinary install, and
-# `docs/publication-checklist.md` is the page that says so. What publication already
-# changed is WHICH checkout and HOW it is reached — both are this project's own public
+# The full job builds them from a checkout of each of this project's own public
 # repositories, read at the tag of the release this demonstration shows, with no credential:
 #
-#   fredaime/sayfirst-control-plane   at v0.3.0   the contract, the boundary, the server
-#   fredaime/sayfirst-cli             at v0.3.0   the command a person answers with
+#   fredaime/sayfirst-control-plane   at v0.3.2   the contract, the boundary, the server
+#   fredaime/sayfirst-cli             at v0.3.2   the command a person answers with
 #
 # Those names are lines of this file now. They were repository variables while they were not
 # this repository's to publish; they are public addresses a reader can open, the tag is the
 # one number the project file pins, and `tests/test_gate_modes.py` reads both out of this
 # file and the tag out of `pyproject.toml` so the three cannot drift apart.
 #
+# The index job checks out neither product. It runs the gate with no source named, which is
+# what a reader who clones this repository alone does, and the gate installs the pinned
+# versions from the index — the same versions, reached the way a reader reaches them.
+#
 # What happens when neither name answers at that tag is the ordinary case rather than a
 # crash: this repository is published AFTER the two products it pins, so a run made before
 # that day — and a fork on a runner that cannot reach them — finds nothing there. An absence
-# is a fact about the world. So this workflow renders three outcomes and not two:
+# is a fact about the world. So this workflow renders three outcomes and not two, and a
+# third job holds the reduced one:
 #
 #   gate (full)                      everything was built from the two public checkouts and
 #                                    every check ran. `scripts/gate.sh` exits 0.
+#   gate (from the index)            nothing was checked out: the gate installed the pinned
+#                                    versions from the index, every check ran, and the gate
+#                                    said in its own line that the index was the route. Exits
+#                                    0. A reduced result here is a failure — the index did not
+#                                    deliver what the project file pins, and that is a fact
+#                                    a green tick must not cover; so is a full result that
+#                                    does not name the index.
 #   gate (reduced — the open         neither product answers at the tag, or only one does.
-#   distributions are absent,        Format, lint and every check that needs nothing ran;
-#   some checks not run)             the rest are named and counted in the job's summary and
-#                                    in an annotation. `scripts/gate.sh` exits 75. The tick
-#                                    is green and the job says, in its own name, what it did
+#   distributions are absent,        The gate is told to refuse the index too, so what runs
+#   some checks not run)             is what a machine without the distributions can run:
+#                                    format, lint and every check that needs nothing; the
+#                                    rest are named and counted in the job's summary and in
+#                                    an annotation. `scripts/gate.sh` exits 75. The tick is
+#                                    green and the job says, in its own name, what it did
 #                                    not prove.
 #   failure                          anything else — including a full job whose gate came
 #                                    back reduced, and a reduced job whose gate came back
@@ -68,7 +79,7 @@ jobs:
         env:
           plane: https://github.com/fredaime/sayfirst-control-plane
           client: https://github.com/fredaime/sayfirst-cli
-          tag: v0.3.0
+          tag: v0.3.2
         run: |
           answered=yes
           for address in "$plane" "$client"; do
@@ -104,14 +115,14 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: fredaime/sayfirst-control-plane
-          ref: v0.3.0
+          ref: v0.3.2
           path: control-plane
           fetch-depth: 0
 
       - uses: actions/checkout@v5
         with:
           repository: fredaime/sayfirst-cli
-          ref: v0.3.0
+          ref: v0.3.2
           path: client
           fetch-depth: 0
 
@@ -123,9 +134,9 @@ jobs:
         working-directory: demo
         env:
           SAYFIRST_CONTRACT_SOURCE: ${{ github.workspace }}/control-plane
-          SAYFIRST_CONTRACT_REF: v0.3.0
+          SAYFIRST_CONTRACT_REF: v0.3.2
           SAYFIRST_CLIENT_SOURCE: ${{ github.workspace }}/client
-          SAYFIRST_CLIENT_REF: v0.3.0
+          SAYFIRST_CLIENT_REF: v0.3.2
         run: |
           status=0
           ./scripts/gate.sh || status=$?
@@ -139,6 +150,57 @@ jobs:
               ;;
             75)
               echo "::error::both products answered at the tag and the gate still came back reduced: a checkout was not there"
+              exit 1
+              ;;
+            *)
+              exit "$status"
+              ;;
+          esac
+
+  # The other route to the same three distributions. It waits on the question like the two
+  # jobs beside it and turns on neither answer: whether a tag is readable says nothing about
+  # what the index holds, so this job runs either way, and the gate itself says whether the
+  # index delivered.
+  index:
+    name: gate (from the index)
+    needs: reachable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: demo
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.12.5"
+
+      # No checkout of either product: a reader who clones this repository alone installs
+      # the pinned distributions from the index, and so does this job.
+      - name: gate (from the index)
+        working-directory: demo
+        run: |
+          set +e
+          ./scripts/gate.sh 2>&1 | tee gate.log
+          status=${PIPESTATUS[0]}
+          set -e
+          case "$status" in
+            0)
+              # The status says every check ran; the gate's own line says which route
+              # delivered what they ran against, and a full gate that cannot say it was the
+              # index is not what this job vouches for.
+              if ! grep -qx 'gate: the open distributions came from index' gate.log; then
+                echo "::error::the gate came back full without saying the index delivered the distributions"
+                exit 1
+              fi
+              {
+                echo "### gate (from the index): full green"
+                echo ""
+                echo "No checkout was named. The gate installed the pinned versions from the"
+                echo "index, as a reader does, and format, lint and every check ran."
+              } >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            75)
+              echo "::error::the index did not deliver everything the gate needs (the distributions or the client): the gate came back reduced"
               exit 1
               ;;
             *)
@@ -162,9 +224,13 @@ jobs:
 
       # No second checkout: the answer above is that the tag is not there to read, and asking
       # anyway is three minutes of retries ending in a ref that was never found. The source
-      # variables are left unset so the gate finds nothing and says so.
+      # variables are left unset, and the index is refused by name, so the gate has neither
+      # route and says so. Without the refusal it would install from the index and this job
+      # would be a second index job wearing a reduced name.
       - name: gate (reduced)
         working-directory: demo
+        env:
+          SAYFIRST_INDEX: "no"
         run: |
           set +e
           ./scripts/gate.sh 2>&1 | tee gate.log
@@ -185,8 +251,7 @@ jobs:
                 echo "about this demonstration against a control plane."
                 echo ""
                 echo "What would make it full: a runner that can read the two products at the"
-                echo "tag this project pins — or the three distributions on an index, which"
-                echo "retires both checkouts entirely."
+                echo "tag this project pins. The index route is its own job."
               } >> "$GITHUB_STEP_SUMMARY"
               echo "::warning::${headline} — this is a reduced gate, not a full one"
               ;;

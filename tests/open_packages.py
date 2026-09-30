@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 """Which checks the open distributions' absence cost, established by collecting them.
 
-The three distributions this demonstration is built on are published on no index yet, and
-they cannot be vendored here. So there are machines where they simply are not present: a
-reader who cloned this repository and nothing else, and this project's own CI whenever the
-read credential is not set.
+The distributions this demonstration is built on come from the index or from checkouts of
+the two open repositories, and they cannot be vendored here. So there are machines where
+they simply are not present: one with no network and no checkout named, and this project's
+own CI job that refuses the index (SAYFIRST_INDEX=no) to prove the reduced route.
 
 A gate that stops dead on those machines proves nothing. A gate that runs what it can and
 calls the result an ordinary pass proves less than it says it does. Article 2 forbids the

@@ -2,33 +2,34 @@
 # SPDX-License-Identifier: Apache-2.0
 # One-time setup. Idempotent: safe to re-run.
 #
-# Two of the three things it installs are published distributions; the third is a command a
-# person types, installed as a tool rather than as a dependency of anything. A model is
-# NOT installed: this demonstration runs its tests with no model at all, and a reader who
-# wants to watch it reason names an endpoint and a model of their own. The pull below is
-# one vendor's way of getting one locally, offered and not required.
+# The open distributions come from the index, at the version pinned here, or from checkouts
+# when SAYFIRST_CONTRACT_SOURCE and SAYFIRST_CLIENT_SOURCE name them; the command a person
+# answers with is installed beside them. A model is not installed: fixture mode plays a
+# scripted transcript, and a reader who wants to watch a model reason names an endpoint. The
+# pull below is one vendor's way of getting one locally, offered and not required.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-command -v uv >/dev/null || { echo "uv is required: https://docs.astral.sh/uv/" >&2; exit 1; }
+# 7, the precondition status scripts/lib/environment.sh names: nothing is sourced yet here.
+command -v uv >/dev/null || { echo "uv is required: https://docs.astral.sh/uv/" >&2; exit 7; }
 
 echo "==> the environment"
 # A reduced environment is a fact about this machine, not a failure: the gate reserves 75
-# for it and has already said which checkouts it could not find. Tolerated here, and what it
-# reaches is said in full below rather than implied: ONE environment, at `.venv`, which a
-# reduced run prepares without the open distributions and without the daemon. So the reader
-# this mode exists for — someone who cloned this repository and nothing else — reaches a
-# CONFIGURED demonstration, and every take of it refuses by name until the distributions are
-# installed. Any other non-zero status is a failure and stops here.
+# for it and has already said that neither the index nor a named checkout delivered the open
+# distributions. Tolerated here, and what it reaches is said in full below rather than
+# implied: ONE environment, at `.venv`, which a reduced run prepares without the open
+# distributions and without the daemon. So a reader on a machine with neither route — no
+# network, or SAYFIRST_INDEX=no and no checkout named — reaches a CONFIGURED demonstration,
+# and every take of it refuses by name until the distributions are installed. Any other
+# non-zero status is a failure and stops here.
 environment_status=0
 ./scripts/gate.sh --environment-only || environment_status=$?
 if [ "$environment_status" -ne 0 ] && [ "$environment_status" -ne 75 ]; then
   exit "$environment_status"
 fi
 if [ "$environment_status" -eq 75 ]; then
-  echo "    the environment is reduced: the checkouts the open distributions are built from"
-  echo "    are absent, so the tiers that need them will stand down BY NAME when you run"
-  echo "    ./scripts/gate.sh, which counts them and says what they do not prove."
+  echo "    the environment is reduced: neither the index nor a named checkout delivered the"
+  echo "    open distributions. ./scripts/gate.sh says which checks that leaves out."
 fi
 
 echo "==> configuration"
@@ -44,14 +45,18 @@ echo "==> runtime directories"
 mkdir -p runtime/outbox runtime/reports runtime/events
 
 echo "==> the command a person answers with"
-if command -v sayfirst >/dev/null; then
+# At the release this tree carries, read rather than spelled: the gate installs the command
+# at the contract's pinned version, and one number is said everywhere in this project — a
+# script that spelled it would be the second place it was said. The reader runs under a
+# bare interpreter, so a reduced environment answers it too.
+release="$(.venv/bin/python scripts/release_version.py)"
+if [ -x .venv-client/bin/sayfirst ]; then
+  echo "    sayfirst is at .venv-client/bin/sayfirst — put it on your PATH, or install it"
+  echo "    for your account with: uv tool install sayfirst-cli==$release"
+elif command -v sayfirst >/dev/null; then
   echo "    sayfirst is on the path"
-elif [ -x .venv-client/bin/sayfirst ]; then
-  echo "    sayfirst is at .venv-client/bin/sayfirst (the gate built it)"
 else
-  echo "    sayfirst is not installed. It is the product command-line interface and it is"
-  echo "    what answers a suspended act. Install it with 'uv tool install sayfirst-cli'"
-  echo "    once it is published, or let ./scripts/gate.sh build it from a checkout."
+  echo "    sayfirst is not installed. It answers a suspended act: uv tool install sayfirst-cli==$release"
 fi
 
 echo "==> a model, if you want one"
@@ -69,30 +74,32 @@ if [ -n "${MODEL_NAME:-}" ] && command -v ollama >/dev/null; then
     echo "             able to CHOOSE an act. See docs/ARCHITECTURE.md." >&2
   fi
 else
-  echo "    no model was pulled. Set MODEL_MODE=real, MODEL_BASE_URL and MODEL_NAME to any"
-  echo "    endpoint that speaks the OpenAI-compatible API and serves a tool-calling model."
+  echo "    no model: MODEL_MODE=fixture plays a scripted transcript. To watch a model reason,"
+  echo "    set MODEL_MODE=real, MODEL_BASE_URL and MODEL_NAME in .env (any OpenAI-compatible"
+  echo "    endpoint serving a tool-calling model)."
 fi
 
 cat <<'NEXT'
 
 Bootstrap complete. Next:
 
-  ./scripts/start-control-plane.sh      # terminal 1 — the authority, on a local socket
+  ./scripts/start-control-plane.sh      # terminal 1 — the control plane, on a local socket
   ./scripts/check-demo.sh               # terminal 2 — every precondition, observed
-  ./scripts/run-demo.sh hitl            # terminal 2 — run the agent
+  ./scripts/run-demo.sh hitl            # terminal 2 — run the agent; answer in a third
+  ./scripts/reset-demo.sh               # between takes — a fresh control plane and outbox
 NEXT
 
 # What this environment reaches, said here rather than discovered one command later. A
 # reduced environment is CONFIGURED — `.env` is written, the directories are there, the
-# agent's own dependencies are installed — and each of the three commands above refuses by
-# name, saying which distribution is missing and the two ways to obtain it. That is the
-# honest reading of « complete »: complete for what this machine holds.
+# agent's own dependencies are installed — and each of the first three commands above
+# refuses by name, saying which distribution is missing and the two ways to obtain it; the
+# fourth needs none of them. That is the honest reading of « complete »: complete for what
+# this machine holds.
 if [ "$environment_status" -eq 75 ]; then
   cat <<'REDUCED'
-Each of those three will REFUSE on this machine, by name: the open distributions are
-published on no index yet and no checkout of them was found, so the environment holds the
-interpreter, this package and its own dependencies and not them. Re-run this script with
+The first three will REFUSE on this machine, by name: neither the index nor a named checkout
+delivered the open distributions. Re-run with network access, or with
 SAYFIRST_CONTRACT_SOURCE and SAYFIRST_CLIENT_SOURCE naming checkouts of the two open
-repositories, and the same three commands run.
+repositories.
 REDUCED
 fi
