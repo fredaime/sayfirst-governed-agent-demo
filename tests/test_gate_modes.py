@@ -376,7 +376,7 @@ def test_the_gate_names_no_checkout_by_default() -> None:
 
 def test_both_gate_jobs_decide_every_status() -> None:
     jobs = _gate_jobs()
-    assert len(jobs) == 2, f"expected a full job and a reduced job, found {sorted(jobs)}"
+    assert len(jobs) == 3, f"expected a full, an index and a reduced job, found {sorted(jobs)}"
     for identifier, lines in jobs.items():
         body = "\n".join(lines)
         for branch in (r"^\s*0\)", rf"^\s*{_declared('GATE_REDUCED_GREEN')}\)", r"^\s*\*\)"):
@@ -496,7 +496,7 @@ def test_every_check_the_workflow_runs_is_the_gate() -> None:
     a contributor cannot run.
     """
     assert _checks_outside_the_gate(WORKFLOW_TEXT) == []
-    assert WORKFLOW_CODE.count("scripts/gate.sh") == 2, "the two gate jobs run it, and only it"
+    assert WORKFLOW_CODE.count("scripts/gate.sh") == 3, "the three gate jobs run it, and only it"
 
 
 def test_the_rule_catches_a_check_that_exists_only_here() -> None:
@@ -595,7 +595,7 @@ def test_no_job_reads_a_credential_and_the_question_is_asked_before_any_checkout
         tuple(line.strip() for line in lines if line.strip().startswith("needs:"))
         for lines in gates.values()
     }
-    assert len(waited) == 1, f"the two gate jobs wait on different things: {waited}"
+    assert len(waited) == 1, f"the gate jobs wait on different things: {waited}"
     needs = waited.pop()
     assert len(needs) == 1, f"a gate job waits on {needs}"
     question = needs[0].removeprefix("needs: ")
@@ -641,14 +641,14 @@ def test_no_checkout_falls_back_to_a_token_scoped_to_this_repository() -> None:
 
 def test_every_job_runs_the_pinned_toolchain() -> None:
     """Three tools stand between a commit and a verdict here: the checkout, the installer
-    and the version of the installer. Each is named with a version, and BOTH GATE jobs carry
+    and the version of the installer. Each is named with a version, and EVERY GATE job carries
     the installer — a job that installed whatever resolved that morning would report on
     this tree under a toolchain nobody chose. The sign-off job carries neither: it runs one
     script of this repository with the runner's own interpreter and installs nothing."""
     assert _toolchain_that_moves(WORKFLOW_TEXT) == []
     lines = WORKFLOW_TEXT.splitlines()
-    assert lines.count(UV_ACTION) == 2, "both the full job and the reduced job install it"
-    assert lines.count(UV_VERSION) == 2
+    assert lines.count(UV_ACTION) == 3, "the full, the index and the reduced job all install it"
+    assert lines.count(UV_VERSION) == 3
 
 
 def test_the_pinning_rule_catches_a_toolchain_that_moves() -> None:
@@ -879,3 +879,435 @@ def test_the_sign_off_job_is_the_one_check_outside_the_gate() -> None:
     }
     assert outside == {SIGN_OFF_JOB}, outside
     assert "the sign-off check" in WORKFLOW_TEXT, "the header does not state the exception"
+
+
+def test_with_no_checkout_the_gate_asks_the_index_before_it_reduces() -> None:
+    """The distributions are on the index: a clone of this repository alone runs the full gate."""
+    assert 'use_index="${SAYFIRST_INDEX:-yes}"' in GATE_TEXT
+    for route in ("route=index", "route=checkouts", "route=none"):
+        assert route in GATE_TEXT, route
+    index_install = re.search(
+        r'uv pip install --quiet --python "\$python" \$open_pins \$server_pins', GATE_TEXT
+    )
+    assert index_install, "the index route does not install the pinned distributions"
+    assert 'echo "gate: the open distributions came from $route' in GATE_TEXT
+
+
+def test_a_reduced_run_removes_only_when_no_route_delivered_them() -> None:
+    """The removal loop runs in reduced mode, and every path into reduced mode sets route=none."""
+    removal_loop = 'if [ "$mode" = reduced ]; then\n  for distribution in'
+    before, separator, _ = GATE_TEXT.partition(removal_loop)
+    assert separator, "the removal loop moved; this rule reads it by its guard line"
+    reductions = before.count("mode=reduced")
+    assert reductions == 2, f"expected the two ways into reduced mode, found {reductions}"
+    assert before.count("route=none") == reductions, "a way into reduced mode leaves a route set"
+
+
+def test_the_workflow_runs_the_index_route_and_keeps_a_reduced_job_honest() -> None:
+    jobs = _gate_jobs()
+    names = {identifier: _name(lines) for identifier, lines in jobs.items()}
+    index_jobs = [i for i, n in names.items() if "index" in n.lower()]
+    assert len(index_jobs) == 1, names
+    body = "\n".join(jobs[_reduced_identifier()])
+    assert 'SAYFIRST_INDEX: "no"' in body
+    # The status says every check ran; only the gate's own line says which route delivered
+    # what they ran against, and the index job is the job that reads it.
+    index_body = "\n".join(jobs[index_jobs[0]])
+    assert "tee gate.log" in index_body, "the index job keeps no log to read the route from"
+    assert "gate: the open distributions came from index" in index_body, (
+        "the index job trusts the status alone"
+    )
+
+
+def test_the_route_a_run_names_is_the_route_that_delivered() -> None:
+    """Both routes install the same version numbers, and an installer that finds a number
+    already present leaves the other route's copies in place. So each route records itself
+    in the environment it filled, and the index route reinstalls over anything it did not
+    record — held as text, because the behavioural form is two full gates with a checkout
+    of both products beside them.
+    """
+    for environment in ('"$venv"', '"$repository/.venv-client"'):
+        for route in ("checkouts", "index"):
+            assert f"record_route {environment} {route}" in GATE_TEXT, (environment, route)
+    # Each environment's record is read into a name BEFORE the bracket below removes it, and
+    # that name is what decides how the index is asked for what fills it.
+    assert 'previously="$(recorded_route "$venv")"' in GATE_TEXT
+    assert 'if [ "$previously" = index ]; then' in GATE_TEXT
+    assert 'client_previously="$(recorded_route "$repository/.venv-client")"' in GATE_TEXT
+    assert 'if [ "$client_previously" = index ]; then' in GATE_TEXT
+    reinstall = 'uv pip install --quiet --python "$python" --reinstall $open_pins $server_pins'
+    assert reinstall in GATE_TEXT, "the index route never reinstalls over another route's copies"
+    # A reduced environment holds no route and no client an earlier run built.
+    removal_loop = 'if [ "$mode" = reduced ]; then\n  for distribution in'
+    _, _, after = GATE_TEXT.partition(removal_loop)
+    reduced_block = after.partition("\nfi\n")[0]
+    assert 'rm -f "$(route_record "$venv")"' in reduced_block
+    assert 'rm -rf "$repository/.venv-client"' in reduced_block
+
+
+def test_an_empty_contract_pin_is_refused_before_a_client_is_named() -> None:
+    """`sayfirst-cli==` with nothing after it is a request the index would answer with
+    whatever it had; the gate refuses first, naming the pin it could not read."""
+    refusal = GATE_TEXT.find('if [ -z "$release" ]; then')
+    named = GATE_TEXT.find('"sayfirst-cli==$release"')
+    assert 0 < refusal < named, "sayfirst-cli== would be asked for with no version"
+    assert "pins no sayfirst-contract==" in GATE_TEXT
+
+
+def test_the_index_switch_is_yes_or_no_and_nothing_else() -> None:
+    """A third value is refused with the usage-error status, never read as one of the two."""
+    assert 'use_index="${SAYFIRST_INDEX:-yes}"' in GATE_TEXT
+    assert 'case "$use_index" in\n  yes|no) ;;' in GATE_TEXT, "a third value is read as one of two"
+    assert 'elif [ "$use_index" = yes ]; then' in GATE_TEXT
+    assert GATE_TEXT.count("exit 2") == 3, "the two argument refusals and this one, and no other"
+
+
+#: The line on which a bare run, finding a checkouts run's copies and no index to answer,
+#: refuses instead of reducing. Held as the whole condition: the record alone would fire on
+#: an environment the installer had already emptied, and the measurement alone on one the
+#: index filled.
+REFUSES_OVER_A_CHECKOUTS_RUNS_COPIES = (
+    'elif [ "$previously" = checkouts ] && open_distributions_are_importable; then'
+)
+
+
+def _index_route(text: str) -> str | None:
+    """The branch of the gate that asks the index, or None when there is no such branch."""
+    _, separator, after = text.partition('elif [ "$route" = index ]; then')
+    if not separator:
+        return None
+    return after.partition("\nfi\n")[0]
+
+
+def _removes_what_a_checkouts_run_installed(text: str) -> list[str]:
+    """Every way a bare run could come to remove distributions a checkouts run built.
+
+    One reading, so that the green case and the planted mutations below ask the same
+    question: two copies of one rule is how a guard and its own probe stop agreeing.
+    """
+    block = _index_route(text)
+    if block is None:
+        return ["the gate has no index route, so the rule would hold vacuously"]
+    reduction = block.find("mode=reduced")
+    if reduction < 0:
+        return ["the index route never reduces, so the rule would hold vacuously"]
+    refusal = block.find(REFUSES_OVER_A_CHECKOUTS_RUNS_COPIES)
+    if refusal < 0:
+        return ["nothing refuses when the index is silent over a checkouts run's copies"]
+    if refusal > reduction:
+        return ["the run reduces before it can refuse, and the removal loop then runs"]
+    problems: list[str] = []
+    refused = block[refusal:reduction]
+    if 'record_route "$venv" checkouts' not in refused:
+        problems.append("the record the refusal found is not put back, so the next run removes")
+    if "nothing was removed" not in refused:
+        problems.append("the refusal does not say that nothing was removed")
+    if "name the checkouts or restore the network" not in refused:
+        problems.append("the refusal does not say what would make the run full")
+    if "exit 1" not in refused:
+        problems.append("the refusal does not exit as an ordinary failure")
+    return problems
+
+
+def test_a_plain_run_never_removes_what_a_checkouts_run_installed() -> None:
+    """A bare run after a checkouts run, with the index unreachable, is refused whole.
+
+    Found by running exactly that: the checkouts run had recorded itself, the bare run
+    asked the index, the index did not answer, the run reduced — and the removal loop
+    then uninstalled the distributions and the client the checkouts run had built. A
+    reduced run is « this environment without the open distributions », and that sentence
+    is the right one only when no route ever delivered them. Here one had. So the run is
+    refused instead, exits as a failure and not as a reduced run, says that nothing was
+    removed, and puts back the record it found, because the installer that could not
+    resolve touched nothing — and that is measured on the same line, not assumed.
+    """
+    assert _removes_what_a_checkouts_run_installed(GATE_TEXT) == []
+    # And the refusal reaches a reader before the environment-only stop as well as before
+    # the run: it sits inside the block that fills the environment, not after it.
+    assert GATE_TEXT.find(REFUSES_OVER_A_CHECKOUTS_RUNS_COPIES) < GATE_TEXT.find(
+        'if [ "$environment_only" = yes ]; then'
+    )
+
+
+def test_the_checkouts_rule_catches_a_gate_that_would_reduce_over_them() -> None:
+    """WATCHED FIRING, one planted mutation per shape, against copies of the real file.
+
+    The first is the gate as it was. The second keeps the refusal and loses the record,
+    which defers the removal to the very next run rather than preventing it.
+    """
+    for mutation, was, becomes in (
+        (
+            "the refusal removed",
+            REFUSES_OVER_A_CHECKOUTS_RUNS_COPIES,
+            "elif false; then",
+        ),
+        (
+            "the record not put back",
+            '    record_route "$venv" checkouts\n    echo "gate: the environment holds',
+            '    echo "gate: the environment holds',
+        ),
+    ):
+        planted = GATE_TEXT.replace(was, becomes, 1)
+        assert planted != GATE_TEXT, f"the plant for {mutation} changed nothing"
+        assert _removes_what_a_checkouts_run_installed(planted), f"FAIL {mutation} was not caught"
+
+
+#: The line on which a bare run, finding the command a checkouts run built and no index to
+#: serve its own, refuses instead of removing it. Held as the whole condition, as its twin
+#: above is: the record alone would fire on an environment the installer had already emptied.
+REFUSES_OVER_A_CHECKOUTS_RUNS_CLIENT = (
+    'elif [ "$client_previously" = checkouts ] && '
+    '[ -x "$repository/.venv-client/bin/sayfirst" ]; then'
+)
+
+#: The one removal of the command's environment the index route may make, and where.
+REMOVES_THE_CLIENT = 'rm -rf "$repository/.venv-client"'
+
+
+def _client_from_the_index(text: str) -> str | None:
+    """The block of the gate that asks the index for the command, or None when there is none.
+
+    Read by its opening line at the top level: the two other readings of the route are
+    `elif` branches, and the tail's advice is one of them.
+    """
+    _, separator, after = text.partition('\nif [ "$route" = index ]; then\n')
+    if not separator:
+        return None
+    return after.partition("\nfi\n")[0]
+
+
+def _removes_the_client_a_checkouts_run_built(text: str) -> list[str]:
+    """Every way the index route could come to remove the command a checkouts run built.
+
+    One reading, so that the green case and the planted mutations below ask the same
+    question: two copies of one rule is how a guard and its own probe stop agreeing.
+    """
+    block = _client_from_the_index(text)
+    if block is None:
+        return ["the gate never asks the index for the command, so the rule would hold vacuously"]
+    removals = block.count(REMOVES_THE_CLIENT)
+    if removals != 1:
+        return [f"the command's environment is removed {removals} times in the block, not once"]
+    problems: list[str] = []
+    if 'client_previously="$(recorded_route "$repository/.venv-client")"' not in block:
+        problems.append("the command's record is not read before the bracket removes it")
+    refusal = block.find(REFUSES_OVER_A_CHECKOUTS_RUNS_CLIENT)
+    if refusal < 0:
+        problems.append(
+            "nothing refuses when the index cannot serve the command a checkouts run built"
+        )
+        return problems
+    removed_at = block.find(REMOVES_THE_CLIENT)
+    if removed_at < block.find("uv pip install"):
+        problems.append("the command is removed before the index is asked")
+    if removed_at < refusal:
+        problems.append("the command is removed before the refusal can keep it")
+        return problems
+    if "--reinstall" not in block[:refusal]:
+        problems.append("the index's command is never installed over what is there")
+    refused = block[refusal:removed_at]
+    if 'record_route "$repository/.venv-client" checkouts' not in refused:
+        problems.append("the record the refusal found is not put back, so the next run removes")
+    if "nothing was removed" not in refused:
+        problems.append("the refusal does not say that nothing was removed")
+    if "exit 1" not in refused:
+        problems.append("the refusal does not exit as an ordinary failure")
+    return problems
+
+
+def test_a_plain_run_keeps_the_command_a_checkouts_run_built() -> None:
+    """The twin of the rule above, for the other environment.
+
+    Reachable in the window between the control plane's publication and the command's: the
+    index delivers the distributions and not the command. The index route used to remove a
+    command whose record was not its own BEFORE asking the index, and again when the index
+    did not answer — so a bare run ended reduced having uninstalled what a checkouts run
+    built. Now the index's copy is installed over what is there, an install the index cannot
+    resolve touches nothing, and when the command a checkouts run built is still there the
+    run refuses whole, exits as a failure, says nothing was removed, and puts the record back.
+    The one removal left is for a command no run this gate can name put there.
+    """
+    assert _removes_the_client_a_checkouts_run_built(GATE_TEXT) == []
+    assert GATE_TEXT.find(REFUSES_OVER_A_CHECKOUTS_RUNS_CLIENT) < GATE_TEXT.find(
+        'if [ "$environment_only" = yes ]; then'
+    )
+    # The environment is made only when there is none: remaking it is a way of emptying it.
+    assert 'if [ ! -x "$repository/.venv-client/bin/python" ]; then' in GATE_TEXT
+
+
+def test_the_command_rule_catches_a_gate_that_would_remove_it() -> None:
+    """WATCHED FIRING, one planted mutation per shape, against copies of the real file.
+
+    The first is the refusal gone. The second is the gate as it was: the command removed
+    before the index is asked. The third keeps the refusal and loses the record, which
+    defers the removal to the very next run rather than preventing it.
+    """
+    for mutation, was, becomes in (
+        (
+            "the refusal removed",
+            REFUSES_OVER_A_CHECKOUTS_RUNS_CLIENT,
+            "elif false; then",
+        ),
+        (
+            "the command removed before the index is asked",
+            '  rm -f "$(route_record "$repository/.venv-client")"\n  client_delivered=yes\n',
+            f"  {REMOVES_THE_CLIENT}\n"
+            '  rm -f "$(route_record "$repository/.venv-client")"\n  client_delivered=yes\n',
+        ),
+        (
+            "the record not put back",
+            '    record_route "$repository/.venv-client" checkouts\n'
+            '    echo "gate: the environment holds the command',
+            '    echo "gate: the environment holds the command',
+        ),
+    ):
+        planted = GATE_TEXT.replace(was, becomes, 1)
+        assert planted != GATE_TEXT, f"the plant for {mutation} changed nothing"
+        assert _removes_the_client_a_checkouts_run_built(planted), f"FAIL {mutation} was not caught"
+
+
+#: The three refusals that stand between a named source and the route decision, as the gate
+#: spells each condition. A name that pointed nowhere used to fall through to the index.
+NAMED_AND_NOT_THERE = (
+    'if [ -n "$contract_source" ] && [ ! -d "$contract_source" ]; then',
+    'if [ -n "$client_source" ] && [ ! -d "$client_source" ]; then',
+    'if [ -n "$client_source" ] && [ -z "$contract_source" ]; then',
+)
+
+
+def test_a_named_source_that_is_not_there_is_refused_rather_than_read_as_none() -> None:
+    """A typo in SAYFIRST_CONTRACT_SOURCE used to come back as a full green from the index.
+
+    Three refusals, each before the route is decided and each exiting as a failure: the
+    contract's checkout named and not a directory; the client's likewise; and the client's
+    named while the contract's is not, because the client's checkout is read only on the
+    checkouts route and a request for one without the other is not a request the index can
+    answer. Each names the path it refused, so that the reader sees the typo. And the route
+    decision itself no longer tests the directory — the refusals are the one place that does,
+    which is what stops a second reading from letting a name through again.
+    """
+    decided = GATE_TEXT.find("route=checkouts")
+    for condition in NAMED_AND_NOT_THERE:
+        at = GATE_TEXT.find(condition)
+        assert 0 < at < decided, f"{condition} is missing or comes after the route is decided"
+        stanza = GATE_TEXT[at:].partition("\nfi\n")[0]
+        assert "exit 1" in stanza, condition
+        assert re.search(r"SAYFIRST_(?:CONTRACT|CLIENT)_SOURCE=\$\w+_source", stanza), (
+            f"the refusal under {condition} does not name the path"
+        )
+    assert 'if [ -n "$contract_source" ]; then\n  mode=full\n  route=checkouts' in GATE_TEXT
+    assert '  if [ -n "$client_source" ]; then\n    materialise' in GATE_TEXT
+    assert '&& [ -d "$contract_source" ]' not in GATE_TEXT, "the route decision reads the directory"
+    assert '&& [ -d "$client_source" ]' not in GATE_TEXT, "the client branch reads the directory"
+
+
+def test_the_advice_for_a_missing_client_names_the_route_that_did_not_deliver() -> None:
+    """On the index route nobody named a checkout, so « point SAYFIRST_CLIENT_SOURCE at one »
+    is advice about a route the reader did not take. The tail says which route failed and
+    what would make that route full; the workflow's own line about the same absence says
+    the index may have failed to deliver either of two things, not only the distributions.
+    """
+    tail = GATE_TEXT.partition('echo "gate: the command a person answers with is absent:')[2]
+    on_index = tail.find('elif [ "$route" = index ]; then')
+    on_checkouts = tail.find("Point SAYFIRST_CLIENT_SOURCE at a checkout")
+    assert 0 < on_index < on_checkouts, "the tail gives one advice for both routes"
+    # What the run PRINTS under that branch, without the comment that argues it: the comment
+    # is allowed to name the advice it refuses, and the printed lines are not.
+    index_advice = _code(tail[on_index:on_checkouts])
+    assert "not deliver sayfirst-cli==$release" in index_advice
+    assert "name both checkouts" in index_advice
+    assert "SAYFIRST_CLIENT_SOURCE" not in index_advice, "the index route sends a reader off it"
+    assert "everything the gate needs (the distributions or the client)" in WORKFLOW_TEXT
+    assert "did not deliver the pinned distributions" not in WORKFLOW_TEXT
+
+
+#: An install into one of the two environments, once continuation lines are joined. The
+#: installs of the development pins and of this repository itself are deliberately outside
+#: it: neither puts an open distribution anywhere, so neither is what the record is about.
+INSTALLS_INTO = {
+    '"$venv"': re.compile(r'^\s*uv pip install\b.*--python "\$python" .*\$open_pins'),
+    '"$repository/.venv-client"': re.compile(
+        r'^\s*(?:if )?uv pip install\b.*--python "\$repository/\.venv-client/bin/python"'
+    ),
+}
+
+
+def _installs_outside_the_bracket(text: str) -> list[str]:
+    """Every install into an environment whose route record is not removed before it and
+    written after it.
+
+    One reading, so that the green case and the planted mutations below ask the same
+    question. Three kinds of line matter for each environment — the removal of its record,
+    the writing of its record, and an install into it — and the rule is about their order:
+    the last thing done to the record before an install is a removal, and every writing of
+    the record follows an install made since that removal.
+    """
+    problems: list[str] = []
+    lines = text.replace("\\\n", " ").splitlines()
+    for environment, installs in INSTALLS_INTO.items():
+        removal = f'rm -f "$(route_record {environment})"'
+        written = f"record_route {environment} "
+        events: list[tuple[int, str]] = []
+        for number, line in enumerate(lines, 1):
+            if removal in line:
+                events.append((number, "removed"))
+            elif written in line:
+                events.append((number, "written"))
+            elif installs.search(line):
+                events.append((number, "installed"))
+        if "installed" not in {kind for _, kind in events}:
+            problems.append(f"nothing installs into {environment}, so the rule holds vacuously")
+            continue
+        last_record, installed_since = "none", False
+        for number, kind in events:
+            if kind == "installed":
+                if last_record != "removed":
+                    problems.append(f"line {number} installs into {environment} under a record")
+                installed_since = True
+            elif kind == "written":
+                if not installed_since:
+                    problems.append(f"line {number} records into {environment} before an install")
+                last_record = "written"
+            else:
+                last_record, installed_since = "removed", False
+    return problems
+
+
+def test_the_route_record_is_removed_before_an_install_and_written_after_it() -> None:
+    """An install that stops halfway leaves an environment no record describes, rather than
+    one an earlier run's record describes wrongly — which the next run would then trust."""
+    assert _installs_outside_the_bracket(GATE_TEXT) == []
+
+
+def test_the_bracket_rule_catches_a_record_that_outlives_an_install() -> None:
+    """WATCHED FIRING, one planted mutation per shape, against copies of the real file.
+
+    The first is the gate as it was: no removal before the checkouts install. The second
+    writes the record before the install it is about, which is the same stale record
+    arriving from the other side.
+    """
+    checkouts_install = (
+        '  rm -f "$(route_record "$venv")"\n'
+        "  # shellcheck disable=SC2086\n"
+        '  uv pip install --quiet --python "$python" --reinstall \\\n'
+        '    --no-index --find-links "$wheelhouse" $open_pins $server_pins\n'
+        '  record_route "$venv" checkouts\n'
+    )
+    assert checkouts_install in GATE_TEXT, "the checkouts install moved; the plants read it whole"
+    for mutation, becomes in (
+        (
+            "no removal before the install",
+            checkouts_install.replace('  rm -f "$(route_record "$venv")"\n', "", 1),
+        ),
+        (
+            "the record written before the install",
+            '  rm -f "$(route_record "$venv")"\n'
+            '  record_route "$venv" checkouts\n'
+            "  # shellcheck disable=SC2086\n"
+            '  uv pip install --quiet --python "$python" --reinstall \\\n'
+            '    --no-index --find-links "$wheelhouse" $open_pins $server_pins\n',
+        ),
+    ):
+        planted = GATE_TEXT.replace(checkouts_install, becomes, 1)
+        assert planted != GATE_TEXT, f"the plant for {mutation} changed nothing"
+        assert _installs_outside_the_bracket(planted), f"FAIL {mutation} was not caught"

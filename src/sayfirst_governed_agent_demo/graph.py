@@ -31,7 +31,7 @@ from langgraph.graph import END, START, StateGraph
 from sayfirst_governed_agent_demo.boundary_setup import governed_node
 from sayfirst_governed_agent_demo.demo_events import EventLog
 from sayfirst_governed_agent_demo.governance_stamp import last_authorisation
-from sayfirst_governed_agent_demo.model import ChatModel, ModelReply
+from sayfirst_governed_agent_demo.model import ChatModel, ModelReply, turn_line
 from sayfirst_governed_agent_demo.settings import (
     CAP_COMMUNICATIONS_SEND_EXTERNAL,
     CAP_DATA_UPLOAD_EXTERNAL,
@@ -232,7 +232,7 @@ def make_reason_node(
         else:
             added = []
 
-        events.model(f"{model.identity} reasoning", turn=len(messages))
+        events.model(turn_line(model), turn=len(messages))
         reply: ModelReply = model.complete(messages, openai_tool_schemas())
         # Prose the model writes IS the report -- but only prose written in the
         # window where a report is what it is writing: after the corpus has been

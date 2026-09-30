@@ -49,13 +49,13 @@ placeholder="user:the-account-that-runs-this-demonstration"
 if [ "$principal" = "$placeholder" ]; then
   echo "SAYFIRST_PRINCIPAL is the policy file's placeholder, which names no account." >&2
   echo "Set it to 'user:' and the account that runs this demonstration, or unset it." >&2
-  exit 1
+  exit "$demo_refusal_status"
 fi
 if ! [[ "$principal" =~ ^user:[a-z0-9][a-z0-9._-]{0,63}$ ]]; then
   echo "SAYFIRST_PRINCIPAL=$principal is not a reference this script can render." >&2
   echo "It wants 'user:' and an identifier: a lowercase letter or a digit, then up to 63" >&2
   echo "more of lowercase letters, digits, dots, underscores and dashes." >&2
-  exit 1
+  exit "$demo_refusal_status"
 fi
 
 # The daemon, asked for by name. The earlier sentence here sent a reader to the bootstrap,
@@ -80,7 +80,7 @@ sed "s|${placeholder}|${principal}|g" demo-policy.toml >"$run/policy.toml"
 chmod 600 "$run/policy.toml"
 grep -qF "${principal}" "$run/policy.toml" || {
   echo "the policy still names the placeholder principal: check demo-policy.toml" >&2
-  exit 1
+  exit "$demo_refusal_status"
 }
 
 cat >"$run/daemon.toml" <<TOML
@@ -118,6 +118,7 @@ Point the agent at it, in another terminal:
 Answer a suspended act, in another terminal:
   sayfirst approvals show    --approval REF --scope local --socket $run/daemon.sock
   sayfirst approvals approve --approval REF --scope local --socket $run/daemon.sock
+  sayfirst approvals reject  --approval REF --scope local --socket $run/daemon.sock
 
 INFO
 

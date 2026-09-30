@@ -4,10 +4,12 @@
 Every line is an OBSERVATION, made against the running system, in the order a take depends
 on them. Nothing here is inferred from configuration.
 
-Three values and not two, because one of the things worth reporting is neither a pass nor a
-failure: a check that could not be made says so and fails, and a facility that is not
-configured at all — a model, in the default mode — is reported as absent rather than as
-either. « Not observed » is never rendered as « OK ».
+Two marks reach the terminal in this version — `[OK]` for something observed and good, `[--]`
+for something observed and bad — and a check that could not be made says so and fails. The
+default mode needs no model, so its model line is an observation of the configuration, `[OK]`
+naming the mode, and not an absence. `Check.ok` keeps a third value, `None`, for a facility
+that is not configured at all: rendered `[ ?]`, counted apart, reached by nothing this version
+configures, and kept so that an absence added tomorrow is never rendered as « OK ».
 
 One limit is stated rather than worked around. This generation of the contract serves no
 per-capability policy read, so « documents.read is allowed » cannot be observed from out
@@ -133,9 +135,9 @@ def run_checks(settings: Settings) -> list[Check]:
     if settings.model.mode is ModelMode.fixture:
         checks.append(
             Check(
-                None,
-                "no model is configured (MODEL_MODE=fixture)",
-                "a take needs MODEL_MODE=real with MODEL_BASE_URL and MODEL_NAME",
+                True,
+                "no model: MODEL_MODE=fixture plays a scripted transcript",
+                "set MODEL_MODE=real with MODEL_BASE_URL and MODEL_NAME to watch a model reason",
             )
         )
     else:

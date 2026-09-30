@@ -31,6 +31,9 @@ run="${SAYFIRST_DEMO_RUN:-${XDG_RUNTIME_DIR:-$HOME/.cache}/sayfirst-demo}"
 export SAYFIRST_SOCKET="${SAYFIRST_SOCKET:-$run/daemon.sock}"
 [ -S "$SAYFIRST_SOCKET" ] || {
   echo "nothing is listening at $SAYFIRST_SOCKET — run ./scripts/start-control-plane.sh" >&2
-  exit 1
+  # Could not ask: nothing listening when a take starts is 4, as is a control plane a node
+  # cannot reach when it asks. A take already waiting for a person keeps waiting if the
+  # control plane stops, then ends suspended (5), nothing sent.
+  exit 4
 }
 exec "$demo_environment/bin/python" -m sayfirst_governed_agent_demo.app "${1:-hitl}" "${@:2}"

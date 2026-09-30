@@ -9,16 +9,27 @@
 #   tests    pytest                   every tier, including the guards and the acceptance
 #                                     suite against a daemon this run starts
 #
-# The three distributions this demonstration is built on are published on no index yet, so
-# this gate is told where a checkout of each is and builds them from a NAMED REF of it
-# rather than from whatever that clone has out. A recording or a gate broken by somebody
-# else's uncommitted work is a hazard this project has met, and an archive of a named ref is
-# the answer to it — solved once, here.
+# The three distributions this demonstration is built on come from one of two routes.
+# Named checkouts: built from a NAMED REF of each (for a contributor, and for the workflow's
+# full job) rather than from whatever that clone has out — a recording or a gate broken by
+# somebody else's uncommitted work is a hazard this project has met, and an archive of a
+# named ref is the answer to it, solved once, here. Otherwise the index: the pinned
+# versions, installed as a reader gets them. `SAYFIRST_INDEX=no` refuses the index, and a
+# run with neither route is reduced.
+#
+# Two refusals guard the choice between them. A source that is NAMED and is not there is
+# refused, never read as unnamed: a mistyped path would otherwise take the index route and
+# come back green, reporting on distributions nobody asked for. And a bare run that finds
+# distributions — or the command a person answers with — that a checkouts run built, with
+# no index to serve its own, refuses rather than reduces: a reduced run removes them, and no
+# plain run removes what an earlier run installed by either route.
 #
 #   SAYFIRST_CONTRACT_SOURCE   a checkout holding the contract, the boundary and the server
 #   SAYFIRST_CONTRACT_REF      default main
 #   SAYFIRST_CLIENT_SOURCE     a checkout holding the command a person answers with
 #   SAYFIRST_CLIENT_REF        default main
+#   SAYFIRST_INDEX             yes (default) or no — no refuses the index route; any other
+#                              value is refused
 #   SAYFIRST_PYTHON            default 3.13
 #   SAYFIRST_GATE_TMP          default /tmp — the short root the test run's own directory is
 #                              made under, and short for a reason a local address decides
@@ -107,6 +118,42 @@ contract_ref="${SAYFIRST_CONTRACT_REF:-main}"
 client_source="${SAYFIRST_CLIENT_SOURCE:-}"
 client_ref="${SAYFIRST_CLIENT_REF:-main}"
 python_version="${SAYFIRST_PYTHON:-3.13}"
+use_index="${SAYFIRST_INDEX:-yes}"
+case "$use_index" in
+  yes|no) ;;
+  *)
+    # Refused rather than read as one of the two: « true », « 1 » and « off » would each take
+    # the index route silently, and the reader who typed them meant something by it.
+    echo "gate: SAYFIRST_INDEX=$use_index is not a value this gate reads. It is yes, the" >&2
+    echo "gate: default, or no, which refuses the index route." >&2
+    exit 2
+    ;;
+esac
+
+# A source that is named is a source this run reads, or a refusal. Tested here, once, so
+# that the route decision below can trust a non-empty name: a name that pointed nowhere used
+# to fall through to the index route, and a typo came back as a full green from the index.
+# The client's checkout is read only on the checkouts route, which the contract's checkout
+# opens, so a client named without the contract is a request this gate cannot honour and
+# says so rather than quietly taking the index.
+if [ -n "$contract_source" ] && [ ! -d "$contract_source" ]; then
+  echo "gate: SAYFIRST_CONTRACT_SOURCE=$contract_source is not a directory. A named checkout" >&2
+  echo "gate: that is not there is refused rather than read as none, because the index route" >&2
+  echo "gate: would otherwise answer for it. Name a checkout that exists, or unset it." >&2
+  exit 1
+fi
+if [ -n "$client_source" ] && [ ! -d "$client_source" ]; then
+  echo "gate: SAYFIRST_CLIENT_SOURCE=$client_source is not a directory. A named checkout" >&2
+  echo "gate: that is not there is refused rather than read as none. Name a checkout that" >&2
+  echo "gate: exists, or unset it." >&2
+  exit 1
+fi
+if [ -n "$client_source" ] && [ -z "$contract_source" ]; then
+  echo "gate: SAYFIRST_CLIENT_SOURCE=$client_source is named and SAYFIRST_CONTRACT_SOURCE is" >&2
+  echo "gate: not. The client's checkout is read only on the checkouts route, which the" >&2
+  echo "gate: contract's checkout opens: name both, or neither." >&2
+  exit 1
+fi
 
 wheelhouse="$repository/.wheelhouse"
 plane_tree="$wheelhouse/control-plane"
@@ -131,16 +178,31 @@ run_root="${SAYFIRST_GATE_TMP:-/tmp}"
 # earlier full run left them — rather than a second directory the other scripts cannot find.
 venv="$repository/.venv"
 
-if [ -n "$contract_source" ] && [ -d "$contract_source" ]; then
+# The route that last filled an environment, recorded IN that environment. The two routes
+# install the same version numbers, and an installer that finds a number already present
+# leaves whatever put it there in place — so without this record a bare run after a checkouts
+# run would keep the checkout-built copies and call them the index's. An environment with no
+# record was filled by nobody this gate can name, and reads as no route at all.
+#
+# Every install into an environment is bracketed: the record is removed before it and
+# written only after it succeeds. An install that stops halfway then leaves an environment
+# no record describes, rather than one an earlier run's record describes wrongly.
+route_record() { printf '%s/.sayfirst-route' "$1"; }
+recorded_route() { cat "$(route_record "$1")" 2>/dev/null || true; }
+record_route() { printf '%s\n' "$2" >"$(route_record "$1")"; }
+
+if [ -n "$contract_source" ]; then
   mode=full
+  route=checkouts
+elif [ "$use_index" = yes ]; then
+  # Decided for good only once the index has delivered them, below.
+  mode=full
+  route=index
 else
   mode=reduced
-  echo "gate: SAYFIRST_CONTRACT_SOURCE names no checkout, so this run is reduced."
-  echo "gate: the contract, the boundary and the server are published on no index yet and"
-  echo "gate: are not vendored here, so a machine without a checkout of them cannot run"
-  echo "gate: the checks that need them. Set SAYFIRST_CONTRACT_SOURCE to such a checkout,"
-  echo "gate: and SAYFIRST_CLIENT_SOURCE to one holding the command a person answers with,"
-  echo "gate: for the full gate."
+  route=none
+  echo "gate: SAYFIRST_CONTRACT_SOURCE names no checkout and SAYFIRST_INDEX=no refuses the"
+  echo "gate: index, so this run is reduced."
 fi
 
 mkdir -p "$wheelhouse"
@@ -186,7 +248,7 @@ materialise() {
     echo "gate: nothing to fall back to. Name a checkout and a ref that exists in it." >&2
     exit 1
   fi
-  echo "gate: reading $what at $ref ($(git -C "$source" rev-parse "$ref"))"
+  echo "gate: reading $what at $ref ($(git -C "$source" rev-parse "$ref^{commit}"))"
   git -C "$source" archive "$ref" | tar -x -C "$destination"
 }
 
@@ -197,7 +259,7 @@ materialise() {
 # nobody chose would be proving something about that machine rather than about this ref.
 client_command="$repository/.venv-client/bin/sayfirst"
 client_built=no
-if [ "$mode" = full ]; then
+if [ "$route" = checkouts ]; then
   materialise "$contract_source" "$contract_ref" "$plane_tree" "the control plane's checkout"
   echo "gate: building the contract, its published fake, the boundary and the server"
   # The fake is built beside the three this repository pins because the contract's own
@@ -208,7 +270,7 @@ if [ "$mode" = full ]; then
     uv build --project "$plane_tree" --package "$package" --wheel -o "$wheelhouse" >/dev/null
   done
 
-  if [ -n "$client_source" ] && [ -d "$client_source" ]; then
+  if [ -n "$client_source" ]; then
     materialise "$client_source" "$client_ref" "$client_tree" "the client's checkout"
     echo "gate: building the command a person answers with"
     uv build --project "$client_tree" --wheel -o "$wheelhouse" >/dev/null
@@ -216,9 +278,11 @@ if [ "$mode" = full ]; then
     # By wheel and not by pin: this repository declares no dependency on that command — it
     # is a tool a person types, not a library — so there is no pin here to read, and the
     # wheel built from the named ref is exactly what a reader is told to install.
+    rm -f "$(route_record "$repository/.venv-client")"
     uv pip install --quiet --python "$repository/.venv-client/bin/python" --reinstall \
       --no-index --find-links "$wheelhouse" "$wheelhouse"/sayfirst_cli-*.whl
     client_built=yes
+    record_route "$repository/.venv-client" checkouts
   else
     # Not built, so it must not be found. An earlier full run's client left on disk would
     # answer this run's approvals, and the run would report on a version it did not build.
@@ -231,6 +295,16 @@ fi
 echo "gate: preparing the development environment ($mode)"
 uv venv --allow-existing --python "$python_version" "$venv" >/dev/null
 python="$venv/bin/python"
+
+# Whether the environment can import the open distributions, asked of the same rule the
+# tests use rather than of a second reading written here. `tests/open_packages.py` owns which
+# packages the answer is read from.
+open_distributions_are_importable() {
+  "$python" -c 'import sys
+sys.path.insert(0, "tests")
+from open_packages import open_packages_are_installed
+sys.exit(0 if open_packages_are_installed() else 1)'
+}
 
 # Every pin is READ from pyproject.toml and never spelled here a second time: two copies of
 # one rule is how a gate and its project stop agreeing.
@@ -260,16 +334,113 @@ dev_pins="$(read_pins dev sayfirst- no)"
 # shellcheck disable=SC2086
 open_distributions="$(printf '%s\n' $open_pins $server_pins | sed 's/[][<>=!~;].*$//')"
 
-if [ "$mode" = full ]; then
+if [ "$route" = checkouts ]; then
   # --reinstall is not optional: a checkout can change without changing its version, and an
   # installer that saw the same version already present leaves the old one in place.
+  rm -f "$(route_record "$venv")"
   # shellcheck disable=SC2086
   uv pip install --quiet --python "$python" --reinstall \
     --no-index --find-links "$wheelhouse" $open_pins $server_pins
+  record_route "$venv" checkouts
+elif [ "$route" = index ]; then
+  # Read before the bracket removes it: which route filled this environment decides both
+  # how the index is asked and what a refusal of the index's answer means.
+  previously="$(recorded_route "$venv")"
+  rm -f "$(route_record "$venv")"
+  delivered=yes
+  if [ "$previously" = index ]; then
+    # Delivered by the index before, at these pinned versions: left as they are, which is
+    # what lets a machine that installed them once keep its full gate offline.
+    # shellcheck disable=SC2086
+    uv pip install --quiet --python "$python" $open_pins $server_pins || delivered=no
+  else
+    # Whatever is present, a checkouts run built it or nobody this gate can name put it
+    # there, and the same version number is exactly what would let it stay. --reinstall, so
+    # that the route this run names is the route that delivered. The index is needed once.
+    # shellcheck disable=SC2086
+    uv pip install --quiet --python "$python" --reinstall $open_pins $server_pins || delivered=no
+  fi
+  if [ "$delivered" = yes ]; then
+    record_route "$venv" index
+  elif [ "$previously" = checkouts ] && open_distributions_are_importable; then
+    # A checkouts run built what is here and the index did not answer. Reduced, this run
+    # would remove them — and a plain run never removes what an earlier run installed by
+    # either route. Refused instead. The installer resolved nothing and so touched nothing,
+    # which is measured on the line above rather than assumed, and the record it found is
+    # put back because it is still the truth about this environment.
+    record_route "$venv" checkouts
+    echo "gate: the environment holds distributions a checkouts run built and the index is" >&2
+    echo "gate: unreachable; name the checkouts or restore the network; nothing was removed." >&2
+    exit 1
+  else
+    echo "gate: the index did not deliver $open_pins $server_pins, so this run is reduced."
+    mode=reduced
+    route=none
+  fi
 fi
 # shellcheck disable=SC2086
 uv pip install --quiet --python "$python" $dev_pins $agent_pins
 uv pip install --quiet --python "$python" --no-deps --editable "$repository"
+
+if [ "$route" = index ]; then
+  # The command a person answers with, at the same release as the contract it answers to,
+  # from the same index. Not a pin of this project — it is a tool a person types, not a
+  # library — so the number is read off the contract's pin rather than spelled here.
+  # shellcheck disable=SC2086
+  release="$(printf '%s\n' $open_pins | sed -n 's/^sayfirst-contract==//p')"
+  if [ -z "$release" ]; then
+    # « sayfirst-cli== » with nothing after it is a request the index would answer with
+    # whatever it had. One number is said everywhere in this project; here it was said nowhere.
+    echo "gate: the project file pins no sayfirst-contract==<version> among « $open_pins »," >&2
+    echo "gate: so there is no release to ask the index for the command a person answers" >&2
+    echo "gate: with at. Pin the contract by version, and run again." >&2
+    exit 1
+  fi
+  # Which route filled the command's environment, read before the bracket removes it. What a
+  # checkouts run built is not this route's, and it is REPLACED rather than removed first:
+  # the index's copy is installed over it with --reinstall, and an install the index cannot
+  # resolve touches nothing — so what was there stays where it was, which is what lets the
+  # refusal below say so truthfully. The environment itself is made only when there is none.
+  client_previously="$(recorded_route "$repository/.venv-client")"
+  if [ ! -x "$repository/.venv-client/bin/python" ]; then
+    uv venv --allow-existing --python "$python_version" "$repository/.venv-client" >/dev/null
+  fi
+  rm -f "$(route_record "$repository/.venv-client")"
+  client_delivered=yes
+  if [ "$client_previously" = index ]; then
+    # Delivered by the index before, at this release: left as it is, which is what lets a
+    # machine that installed it once keep its full gate offline.
+    uv pip install --quiet --python "$repository/.venv-client/bin/python" \
+      "sayfirst-cli==$release" || client_delivered=no
+  else
+    # A checkouts run built what is there, or nobody this gate can name did, and the same
+    # version number is exactly what would let it stay. --reinstall, so that the route this
+    # run names is the route that delivered.
+    uv pip install --quiet --python "$repository/.venv-client/bin/python" --reinstall \
+      "sayfirst-cli==$release" || client_delivered=no
+  fi
+  if [ "$client_delivered" = yes ]; then
+    client_built=yes
+    record_route "$repository/.venv-client" index
+  elif [ "$client_previously" = checkouts ] && [ -x "$repository/.venv-client/bin/sayfirst" ]; then
+    # A checkouts run built the command that is here and the index did not deliver its own.
+    # Removed and counted, this run would end reduced having uninstalled what an earlier run
+    # installed — and a plain run never does that, by either route. Refused instead, with
+    # the record put back because the installer touched nothing: measured by the command
+    # still being there, not assumed.
+    record_route "$repository/.venv-client" checkouts
+    echo "gate: the environment holds the command a checkouts run built and the index did" >&2
+    echo "gate: not deliver sayfirst-cli==$release; name the checkouts or restore the network;" >&2
+    echo "gate: nothing was removed." >&2
+    exit 1
+  else
+    # Neither delivered nor built by a run this gate can name, so it must not be found: it
+    # would answer this run's approvals with a version nobody chose.
+    rm -rf "$repository/.venv-client"
+    echo "gate: the index did not deliver sayfirst-cli==$release; the cases that answer a"
+    echo "gate: suspended act the way a person does will stand down and be counted."
+  fi
+fi
 
 # One environment means a reduced run may find what an earlier FULL run installed in it. That
 # is not a reduced run: it would prove more than it says here and more than it would prove on
@@ -283,15 +454,16 @@ if [ "$mode" = reduced ]; then
     echo "gate: reduced run is this environment without the open distributions."
     uv pip uninstall --quiet --python "$python" "$distribution"
   done
+  # No route delivered anything, so none is on record; and the client an earlier run built
+  # is not this run's — not built, so it must not be found.
+  rm -f "$(route_record "$venv")"
+  rm -rf "$repository/.venv-client"
 fi
 
 # Asked of the same rule the tests use rather than of a second reading written here. Before
 # the environment-only stop as well as before the run, because the bootstrap stops there and
 # the scripts a reader then types read this same environment.
-if [ "$mode" = reduced ] && "$python" -c 'import sys
-sys.path.insert(0, "tests")
-from open_packages import open_packages_are_installed
-sys.exit(0 if open_packages_are_installed() else 1)'; then
+if [ "$mode" = reduced ] && open_distributions_are_importable; then
   echo "gate: the open distributions are importable in the reduced environment at $venv." >&2
   echo "gate: a reduced run must not borrow them; this run would prove more than it says." >&2
   echo "gate: remove them from that environment and run again." >&2
@@ -300,14 +472,14 @@ fi
 
 if [ "$environment_only" = yes ]; then
   if [ "$mode" = full ]; then
-    echo "gate: the environment is ready at $venv"
+    echo "gate: the environment is ready at $venv (from $route)"
     exit "$GATE_FULL_GREEN"
   fi
   echo "gate: the environment at $venv holds everything but the open distributions and the"
   echo "gate: daemon. What it reaches is a configured demonstration whose every take refuses"
   echo "gate: BY NAME — the scripts say which distribution is missing and what installs it —"
-  echo "gate: until a checkout of the two open repositories, or a published index, provides"
-  echo "gate: them."
+  echo "gate: until the index or a checkout of the two open repositories provides them — run"
+  echo "gate: without SAYFIRST_INDEX=no, or name the checkouts."
   exit "$GATE_REDUCED_GREEN"
 fi
 
@@ -372,6 +544,13 @@ else
   absent=""
 fi
 
+# Which route delivered them, said before the result so that a green line is never read
+# without it: a full gate from the index and a full gate from named checkouts prove the same
+# thing about this demonstration and different things about where the distributions came from.
+if [ "$mode" = full ]; then
+  echo "gate: the open distributions came from $route"
+fi
+
 if [ -z "$absent" ]; then
   if [ "$checks_not_run" -ne 0 ]; then
     echo "gate: everything was built and installed and $checks_not_run checks still stood" >&2
@@ -418,8 +597,17 @@ echo "gate: know how many of them there are."
 if [ "$mode" = reduced ]; then
   echo "gate: This is not a pass. It proves nothing about this demonstration against a"
   echo "gate: control plane and nothing about the boundary — read the list above rather than"
-  echo "gate: this line. Point SAYFIRST_CONTRACT_SOURCE and SAYFIRST_CLIENT_SOURCE at"
-  echo "gate: checkouts, and this becomes the full gate."
+  echo "gate: this line. Run it without SAYFIRST_INDEX=no, or point SAYFIRST_CONTRACT_SOURCE and"
+  echo "gate: SAYFIRST_CLIENT_SOURCE at checkouts, and this becomes the full gate."
+elif [ "$route" = index ]; then
+  # The advice names the route that failed to deliver: on the index route no checkout was
+  # named, so « point SAYFIRST_CLIENT_SOURCE at a checkout » would send a reader who chose
+  # the index off it, for a command the index simply did not have at this release.
+  echo "gate: This is not a pass. The control plane was real and every tier that needs one"
+  echo "gate: ran; what did not run is every claim a person answers, because the index did"
+  echo "gate: not deliver sayfirst-cli==$release — read the list above rather than this line."
+  echo "gate: Run again when the index serves that release, or name both checkouts, and this"
+  echo "gate: becomes the full gate."
 else
   echo "gate: This is not a pass. The control plane was real and every tier that needs one"
   echo "gate: ran; what did not run is every claim a person answers, because the command"
