@@ -15,11 +15,11 @@ The act that remained was carried out: this repository was published on 2026-09-
 
 | Distribution | Why | Where it is declared |
 |---|---|---|
-| `sayfirst-contract==0.3.2` | the socket client the boundary speaks through | `project.dependencies` |
-| `sayfirst-boundary==0.3.2` | the boundary itself | `project.dependencies` |
+| `sayfirst-contract==0.3.3` | the socket client the boundary speaks through | `project.dependencies` |
+| `sayfirst-boundary==0.3.3` | the boundary itself | `project.dependencies` |
 | `langgraph` | the agent framework this demonstration governs a node of | `project.dependencies` |
 | `httpx` | the OpenAI-compatible transport, and the health check's model probe | `project.dependencies` |
-| `sayfirst-control-plane==0.3.2` | **development and test, never imported**: `./scripts/start-control-plane.sh` runs its daemon as a separate process, and the acceptance tier starts one of its own | a dependency group of its own |
+| `sayfirst-control-plane==0.3.3` | **development and test, never imported**: `./scripts/start-control-plane.sh` runs its daemon as a separate process, and the acceptance tier starts one of its own | a dependency group of its own |
 
 One number, said everywhere: this demonstration shows one release and pins that release, so
 the version is not a range.
@@ -32,8 +32,8 @@ repositories a reader can open:
 
 | What | Public repository | Tag |
 |---|---|---|
-| the contract, the boundary and the server | [`fredaime/sayfirst-control-plane`](https://github.com/fredaime/sayfirst-control-plane) | `v0.3.2` |
-| the command a person answers with | [`fredaime/sayfirst-cli`](https://github.com/fredaime/sayfirst-cli) | `v0.3.2` |
+| the contract, the boundary and the server | [`fredaime/sayfirst-control-plane`](https://github.com/fredaime/sayfirst-control-plane) | `v0.3.3` |
+| the command a person answers with | [`fredaime/sayfirst-cli`](https://github.com/fredaime/sayfirst-cli) | `v0.3.3` |
 
 Named that way, `scripts/gate.sh` builds the wheels from an archive of that tag rather than
 from whatever a checkout has out, and `.github/workflows/ci.yml` checks both repositories out
