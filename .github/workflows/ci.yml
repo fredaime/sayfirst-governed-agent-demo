@@ -17,8 +17,8 @@
 # The full job builds them from a checkout of each of this project's own public
 # repositories, read at the tag of the release this demonstration shows, with no credential:
 #
-#   fredaime/sayfirst-control-plane   at v0.3.2   the contract, the boundary, the server
-#   fredaime/sayfirst-cli             at v0.3.2   the command a person answers with
+#   fredaime/sayfirst-control-plane   at v0.3.3   the contract, the boundary, the server
+#   fredaime/sayfirst-cli             at v0.3.3   the command a person answers with
 #
 # Those names are lines of this file now. They were repository variables while they were not
 # this repository's to publish; they are public addresses a reader can open, the tag is the
@@ -79,7 +79,7 @@ jobs:
         env:
           plane: https://github.com/fredaime/sayfirst-control-plane
           client: https://github.com/fredaime/sayfirst-cli
-          tag: v0.3.2
+          tag: v0.3.3
         run: |
           answered=yes
           for address in "$plane" "$client"; do
@@ -115,14 +115,14 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: fredaime/sayfirst-control-plane
-          ref: v0.3.2
+          ref: v0.3.3
           path: control-plane
           fetch-depth: 0
 
       - uses: actions/checkout@v5
         with:
           repository: fredaime/sayfirst-cli
-          ref: v0.3.2
+          ref: v0.3.3
           path: client
           fetch-depth: 0
 
@@ -134,9 +134,9 @@ jobs:
         working-directory: demo
         env:
           SAYFIRST_CONTRACT_SOURCE: ${{ github.workspace }}/control-plane
-          SAYFIRST_CONTRACT_REF: v0.3.2
+          SAYFIRST_CONTRACT_REF: v0.3.3
           SAYFIRST_CLIENT_SOURCE: ${{ github.workspace }}/client
-          SAYFIRST_CLIENT_REF: v0.3.2
+          SAYFIRST_CLIENT_REF: v0.3.3
         run: |
           status=0
           ./scripts/gate.sh || status=$?

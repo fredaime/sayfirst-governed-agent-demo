@@ -8,6 +8,11 @@ deciding whether the copy in front of them is the one these documents describe.
 
 ## Unreleased
 
+## 0.3.3
+
+- Pins the control plane and the client at 0.3.3. No change to the demonstration's own
+  code.
+
 ## 0.3.2
 
 - Pins the control plane and the client at 0.3.2, which carry security fixes; an approval in

@@ -109,7 +109,7 @@ What each claim means, and the longer list of what is *not* proven:
 
 ## Quickstart
 
-Everything it needs is on the Python index at 0.3.2: the contract, the boundary and the
+Everything it needs is on the Python index at 0.3.3: the contract, the boundary and the
 control plane this demonstration runs on, and the command a person answers with. No model
 is needed — the default mode plays a scripted transcript — and the governance is real
 either way.
@@ -121,7 +121,7 @@ You need `git` and `uv` (https://docs.astral.sh/uv/); the bootstrap refuses with
 git clone https://github.com/fredaime/sayfirst-governed-agent-demo
 cd sayfirst-governed-agent-demo
 ./scripts/bootstrap.sh                # the environment, a configuration file, directories
-uv tool install sayfirst-cli==0.3.2   # the command a person answers with
+uv tool install sayfirst-cli==0.3.3   # the command a person answers with
 ```
 
 Then three terminals, all in the checkout:
@@ -203,10 +203,10 @@ local one included. The takes and the answers are the same; the model's wording 
 beside this checkout at the tag, and name them — to the bootstrap and to the gate alike:
 
 ```bash
-git clone --branch v0.3.2 https://github.com/fredaime/sayfirst-control-plane ../sayfirst-control-plane
-git clone --branch v0.3.2 https://github.com/fredaime/sayfirst-cli ../sayfirst-cli
-export SAYFIRST_CONTRACT_SOURCE=../sayfirst-control-plane SAYFIRST_CONTRACT_REF=v0.3.2
-export SAYFIRST_CLIENT_SOURCE=../sayfirst-cli SAYFIRST_CLIENT_REF=v0.3.2
+git clone --branch v0.3.3 https://github.com/fredaime/sayfirst-control-plane ../sayfirst-control-plane
+git clone --branch v0.3.3 https://github.com/fredaime/sayfirst-cli ../sayfirst-cli
+export SAYFIRST_CONTRACT_SOURCE=../sayfirst-control-plane SAYFIRST_CONTRACT_REF=v0.3.3
+export SAYFIRST_CLIENT_SOURCE=../sayfirst-cli SAYFIRST_CLIENT_REF=v0.3.3
 ./scripts/bootstrap.sh && ./scripts/gate.sh
 ```
 
@@ -225,7 +225,7 @@ is required: a model is a configuration line here, which is the architectural po
 **The grade is observability, not proof.** The daemon these scripts start runs as the same
 account as the agent, which can therefore write or replace the store. The grade above it is
 defined and unreached by this version; all three are in the control plane's own
-[`SECURITY.md`](https://github.com/fredaime/sayfirst-control-plane/blob/v0.3.2/SECURITY.md).
+[`SECURITY.md`](https://github.com/fredaime/sayfirst-control-plane/blob/v0.3.3/SECURITY.md).
 
 **A reduced gate is green and is not a pass.** `./scripts/gate.sh` exits `75` on a machine
 that cannot obtain the open distributions — with no checkout named it installs from the
@@ -292,7 +292,7 @@ this never depends on, and what must not be published.
 
 ## Status
 
-**0.3.2**, and one number said everywhere. The daemon's distribution is on the index, and so
+**0.3.3**, and one number said everywhere. The daemon's distribution is on the index, and so
 are the two this demonstration imports; the evidence grade is the control plane's to reach.
 [CHANGELOG.md](CHANGELOG.md) has the rest.
 
